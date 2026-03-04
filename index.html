@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1B4F72">
+<link rel="manifest" href="manifest.json">
+<title>Trainingsschema Lisanne</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ==================== TOP BAR ==================== -->
+<div class="topbar" id="topbar">
+  <h1>Trainingsschema <span class="week-badge" id="weekBadge">Week A</span></h1>
+  <div class="subtitle" id="topbarDate"></div>
+</div>
+
+<!-- ==================== WELCOME BANNER ==================== -->
+<div class="welcome-banner" id="welcomeBanner">
+  <span>Welkom terug! Fijn dat je er bent.</span>
+  <button class="close-btn" onclick="closeBanner()">&times;</button>
+</div>
+
+<!-- ==================== TODAY PAGE ==================== -->
+<div class="page active" id="pageTrain">
+  <div id="todayContent"></div>
+</div>
+
+<!-- ==================== AGENDA PAGE ==================== -->
+<div class="page" id="pageAgenda">
+  <div id="agendaContent"></div>
+</div>
+
+<!-- ==================== HISTORY PAGE ==================== -->
+<div class="page" id="pageHistory">
+  <div class="card">
+    <div class="card-header"><span class="icon">&#128202;</span> Trainingsgeschiedenis</div>
+    <div id="historyList"></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><span class="icon">&#128207;</span> Metingen</div>
+    <div id="measurementsList"></div>
+    <div class="checkin-form">
+      <div class="checkin-field">
+        <label>Gewicht (kg)</label>
+        <input type="number" step="0.1" id="inputWeight" placeholder="bv. 74.5">
+      </div>
+      <div class="checkin-field">
+        <label>Taille (cm) — optioneel</label>
+        <input type="number" step="0.5" id="inputWaist" placeholder="bv. 82">
+      </div>
+      <button class="save-btn" onclick="saveMeasurement()">Meting opslaan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TRAINING MODE (fullscreen overlay) ==================== -->
+<div class="training-mode" id="trainingMode">
+  <div class="tm-header" id="tmHeader">
+    <h2>Training</h2>
+    <button class="tm-close" onclick="exitTrainingMode(false)">Stoppen</button>
+  </div>
+  <div class="tm-progress"><div class="tm-progress-bar" id="tmProgressBar" style="width:0%"></div></div>
+  <div class="tm-body" id="tmBody"></div>
+</div>
+
+<!-- ==================== DAY PREVIEW OVERLAY ==================== -->
+<div class="day-preview-overlay" id="dayPreviewOverlay">
+  <div class="dp-header">
+    <button class="dp-back" onclick="closeDayPreview()">&larr; Terug</button>
+    <h2 id="dpTitle">Training</h2>
+  </div>
+  <div class="dp-body" id="dpBody"></div>
+</div>
+
+<!-- ==================== VRIJE TRAINING MODAL ==================== -->
+<div class="modal-overlay" id="vrijModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Vrije training kiezen</div>
+    <div id="vrijOptions"></div>
+    <div class="modal-option" onclick="closeModal()" style="text-align:center; color: var(--text-light);">
+      <div class="opt-title">Toch niet</div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== BOTTOM NAV ==================== -->
+<div class="bottom-nav" id="bottomNav">
+  <button class="nav-item active" onclick="showPage('pageTrain', this)">
+    <span class="nav-icon">&#127939;</span>
+    Vandaag
+  </button>
+  <button class="nav-item" onclick="showPage('pageAgenda', this)">
+    <span class="nav-icon">&#128197;</span>
+    Planning
+  </button>
+  <button class="nav-item" onclick="showPage('pageHistory', this)">
+    <span class="nav-icon">&#128202;</span>
+    Voortgang
+  </button>
+</div>
+
+<!-- Scripts -->
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(function() {});
+}
+</script>
+</body>
+</html>
