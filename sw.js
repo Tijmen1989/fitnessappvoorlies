@@ -1,4 +1,4 @@
-var CACHE_NAME = 'training-v11';
+var CACHE_NAME = 'training-v12';
 var VIDEO_CACHE = 'training-videos-v1';
 var URLS_TO_CACHE = [
   './',
@@ -58,10 +58,20 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // App files: cache-first
+  // App files: network-first, cache als fallback (zodat updates altijd doorkomen)
   event.respondWith(
-    caches.match(event.request).then(function(response) {
-      return response || fetch(event.request);
+    fetch(event.request).then(function(response) {
+      // Update cache met de nieuwe versie
+      if (response.ok) {
+        var clone = response.clone();
+        caches.open(CACHE_NAME).then(function(cache) {
+          cache.put(event.request, clone);
+        });
+      }
+      return response;
+    }).catch(function() {
+      // Geen internet? Gebruik cache
+      return caches.match(event.request);
     })
   );
 });
