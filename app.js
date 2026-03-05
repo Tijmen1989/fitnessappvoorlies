@@ -2053,7 +2053,7 @@ function renderHistory() {
     });
     html += '</div>';
 
-    html += '<div class="chart-container" style="height:300px"><canvas id="strengthChart"></canvas></div>';
+    html += '<div class="chart-container" ><canvas id="strengthChart"></canvas></div>';
     html += '</div>';
   }
 
@@ -2099,7 +2099,7 @@ function renderHistory() {
     // Taille/heup chart
     var measWithBody = measurements.filter(function(m) { return m.waist && m.hip; });
     if (measWithBody.length >= 2) {
-      html += '<div class="chart-container" style="height:220px"><canvas id="waistHipChart"></canvas></div>';
+      html += '<div class="chart-container" ><canvas id="waistHipChart"></canvas></div>';
     }
 
     var mDiff = (latestM.weight - firstM.weight).toFixed(1);
@@ -2200,43 +2200,106 @@ function renderHistory() {
   html += '<button class="save-btn" onclick="saveMeasurement()">Meting opslaan</button>';
   html += '</div></div>';
 
-  // ── SESSION HISTORY ──
+  // ── SESSION HISTORY (GROUPED BY WEEK) ──
   html += '<div class="card">';
   html += '<div class="card-header"><span class="icon">\uD83D\uDCDD</span> Trainingsgeschiedenis</div>';
   html += '<div id="historyList">';
   if (sessions.length === 0) {
     html += '<div class="history-empty"><div class="emoji">\uD83D\uDCDD</div><p>Nog geen trainingen.<br>Na je eerste training verschijnt hier je geschiedenis.</p></div>';
   } else {
-    sessions.slice().reverse().forEach(function(s, ri) {
+    // Group sessions by ISO week
+    var weekGroups = {};
+    var reversedSessions = sessions.slice().reverse();
+    reversedSessions.forEach(function(s, ri) {
       var sIdx = sessions.length - 1 - ri;
       var d = new Date(s.date);
-      var stats = '';
-      if (s.exercises) {
-        var weights = s.exercises.filter(function(e) { return e.weight > 0; }).map(function(e) { return e.weight; });
-        var maxW = weights.length > 0 ? Math.max.apply(null, weights) : 0;
-        if (maxW > 0) stats = 'Zwaarste: ' + maxW + ' kg';
+      var yr = d.getFullYear();
+      var wk = getISOWeek(d);
+      var weekKey = yr + '-W' + (wk < 10 ? '0' : '') + wk;
+      if (!weekGroups[weekKey]) {
+        weekGroups[weekKey] = { week: wk, year: yr, sessions: [] };
       }
-      var feedbackStr = '';
-      if (s.feedback) {
-        var energyEmojis = ['', '\uD83D\uDE29', '\uD83D\uDE14', '\uD83D\uDE10', '\uD83D\uDE0A', '\uD83D\uDCAA'];
-        if (s.feedback.energy) feedbackStr += energyEmojis[s.feedback.energy] + ' ';
-        if (s.feedback.calfPain !== null && s.feedback.calfPain !== undefined && s.feedback.calfPain > 0) feedbackStr += '\uD83E\uDDB5' + s.feedback.calfPain + '/3';
-      }
-      html += '<div class="history-item" style="position:relative">';
-      html += '<div style="display:flex;justify-content:space-between;align-items:flex-start">';
-      html += '<div style="flex:1">';
-      html += '<div class="history-date">' + formatDateNL(d) + '</div>';
-      html += '<div class="history-type">' + (s.name || s.type);
-      if (feedbackStr) html += ' <span style="font-size:12px">' + feedbackStr + '</span>';
+      weekGroups[weekKey].sessions.push({ s: s, sIdx: sIdx, d: d, ri: ri });
+    });
+
+    var weekKeys = Object.keys(weekGroups).sort().reverse();
+    var showAllWeeks = getStore('showAllWeeks', false);
+    var lastTwoWeeks = weekKeys.slice(0, 2);
+
+    weekKeys.forEach(function(wk, wkIdx) {
+      var group = weekGroups[wk];
+      var isRecentWeek = lastTwoWeeks.indexOf(wk) >= 0;
+      var isExpanded = isRecentWeek || showAllWeeks;
+      var sessionCount = group.sessions.length;
+
+      html += '<div style="border-bottom:1px solid var(--border);padding:12px 16px">';
+      html += '<div onclick="toggleWeekGroup(\'' + wk + '\')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">';
+      html += '<span style="font-weight:600;color:var(--text);font-size:14px">Week ' + group.week + ' (' + sessionCount + ' trainingen)</span>';
+      html += '<span style="color:var(--text-light);font-size:16px" id="weekToggle-' + wk + '">' + (isExpanded ? '▼' : '▶') + '</span>';
       html += '</div>';
-      if (stats) html += '<div class="history-stats">' + stats + '</div>';
-      if (s.feedback && s.feedback.note) html += '<div style="font-size:12px;color:var(--text-light);font-style:italic;margin-top:2px">\u201C' + s.feedback.note + '\u201D</div>';
-      html += '</div>';
-      html += '<button onclick="deleteSession(' + sIdx + ')" style="background:none;border:none;color:#e74c3c;font-size:14px;cursor:pointer;padding:4px 6px;opacity:0.5" title="Verwijderen">\uD83D\uDDD1\uFE0F</button>';
+      html += '<div id="weekContent-' + wk + '" style="display:' + (isExpanded ? 'block' : 'none') + ';margin-top:8px">';
+
+      group.sessions.forEach(function(item) {
+        var s = item.s;
+        var sIdx = item.sIdx;
+        var d = item.d;
+        var dayName = ['Zo', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za'][d.getDay()];
+        var dayNum = d.getDate();
+        var monthStr = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'][d.getMonth()];
+
+        var typeStr = s.name || s.type;
+        var weightStr = '';
+        if (s.exercises) {
+          var weights = s.exercises.filter(function(e) { return e.weight > 0; }).map(function(e) { return e.weight; });
+          var maxW = weights.length > 0 ? Math.max.apply(null, weights) : 0;
+          if (maxW > 0) weightStr = '— ' + maxW + ' kg';
+        }
+
+        var feedbackStr = '';
+        if (s.feedback) {
+          var energyEmojis = ['', '\uD83D\uDE29', '\uD83D\uDE14', '\uD83D\uDE10', '\uD83D\uDE0A', '\uD83D\uDCAA'];
+          if (s.feedback.energy) feedbackStr += energyEmojis[s.feedback.energy] + ' ';
+          if (s.feedback.calfPain !== null && s.feedback.calfPain !== undefined && s.feedback.calfPain > 0) feedbackStr += '\uD83E\uDDB5' + s.feedback.calfPain + '/3';
+        }
+
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(0,0,0,0.03);font-size:13px">';
+        html += '<div style="flex:1">';
+        html += '<span style="color:var(--text-light);font-weight:500">' + dayName + ' ' + dayNum + ' ' + monthStr + '</span> ';
+        html += '<span>' + typeStr + '</span> ';
+        if (weightStr) html += '<span style="color:var(--text-light)">' + weightStr + '</span> ';
+        if (feedbackStr) html += '<span>' + feedbackStr + '</span>';
+        html += '</div>';
+        html += '<button onclick="deleteSession(' + sIdx + ')" style="background:none;border:none;color:#e74c3c;font-size:12px;cursor:pointer;padding:2px 4px;opacity:0.5" title="Verwijderen">\uD83D\uDDD1\uFE0F</button>';
+        html += '</div>';
+      });
+
       html += '</div></div>';
     });
+
+    if (!showAllWeeks && weekKeys.length > 2) {
+      html += '<div style="padding:12px 16px;text-align:center">';
+      html += '<button onclick="toggleShowAllWeeks()" style="background:none;border:none;color:var(--primary);font-size:13px;cursor:pointer;padding:4px 0;text-decoration:underline">Toon oudere sessies</button>';
+      html += '</div>';
+    }
   }
   html += '</div></div>';
+
+
+  container.innerHTML = html;
+
+  // Initialize charts after DOM is ready
+  destroyCharts();
+  setTimeout(function() { createProgressCharts(sessions, measurements, weightGoal); }, 60);
+}
+
+// ================================================================
+// PROFILE PAGE RENDERING
+// ================================================================
+function renderProfile() {
+  var container = document.getElementById('pageProfile');
+  if (!container) return;
+
+  var html = '';
 
   // ── INSTELLINGEN ──
   var weekBOn = getStore('weekBEnabled', false);
@@ -2390,10 +2453,6 @@ function renderHistory() {
   html += '</div></div>';
 
   container.innerHTML = html;
-
-  // Initialize charts after DOM is ready
-  destroyCharts();
-  setTimeout(function() { createProgressCharts(sessions, measurements, weightGoal); }, 60);
 }
 
 // ================================================================
@@ -2407,6 +2466,11 @@ function createProgressCharts(sessions, measurements, weightGoal) {
   var gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
   var tooltipBg = isDark ? '#333' : '#fff';
   var tooltipColor = isDark ? '#eee' : '#333';
+
+  // Mobile detection and responsive settings
+  var isMobile = window.innerWidth < 600;
+  var chartFontSize = isMobile ? 10 : 12;
+  var chartTicksLimit = isMobile ? 6 : 12;
 
   var defaultTooltip = {
     backgroundColor: tooltipBg,
@@ -2460,9 +2524,10 @@ function createProgressCharts(sessions, measurements, weightGoal) {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        aspectRatio: isMobile ? 1.3 : 2,
         interaction: { mode: 'index', intersect: false },
         plugins: {
-          legend: { display: false },
+          legend: { display: false, position: 'bottom', labels: { boxWidth: isMobile ? 8 : 12, font: { size: chartFontSize } } },
           tooltip: Object.assign({}, defaultTooltip, {
             callbacks: {
               label: function(ctx) { return ctx.parsed.y + ' kg'; }
@@ -2493,11 +2558,11 @@ function createProgressCharts(sessions, measurements, weightGoal) {
         scales: {
           y: {
             min: wMin, max: wMax,
-            ticks: { callback: function(v) { return v + ' kg'; }, color: textColor, font: { size: 11 } },
+            ticks: { callback: function(v) { return v + ' kg'; }, color: textColor, font: { size: chartFontSize } },
             grid: { color: gridColor }
           },
           x: {
-            ticks: { color: textColor, font: { size: 10 }, maxRotation: 0, maxTicksLimit: 8 },
+            ticks: { color: textColor, font: { size: chartFontSize }, maxRotation: 45, maxTicksLimit: chartTicksLimit },
             grid: { display: false }
           }
         }
@@ -2541,14 +2606,15 @@ function createProgressCharts(sessions, measurements, weightGoal) {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        aspectRatio: isMobile ? 1.3 : 2,
         interaction: { mode: 'index' },
         plugins: {
-          legend: { display: true, position: 'bottom', labels: { color: textColor, padding: 16, usePointStyle: true, pointStyle: 'rectRounded' } },
+          legend: { display: true, position: 'bottom', labels: { color: textColor, padding: 16, usePointStyle: true, pointStyle: 'rectRounded', boxWidth: isMobile ? 8 : 12, font: { size: chartFontSize } } },
           tooltip: defaultTooltip
         },
         scales: {
-          x: { stacked: true, ticks: { color: textColor, font: { size: 10 } }, grid: { display: false } },
-          y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1, color: textColor, font: { size: 11 } }, grid: { color: gridColor }, title: { display: true, text: 'Sessies', color: textColor, font: { size: 11 } } }
+          x: { stacked: true, ticks: { color: textColor, font: { size: chartFontSize }, maxRotation: 45, maxTicksLimit: chartTicksLimit }, grid: { display: false } },
+          y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1, color: textColor, font: { size: chartFontSize } }, grid: { color: gridColor }, title: { display: true, text: 'Sessies', color: textColor, font: { size: 11 } } }
         }
       }
     }));
@@ -2614,21 +2680,22 @@ function createProgressCharts(sessions, measurements, weightGoal) {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          aspectRatio: isMobile ? 1.3 : 2,
           interaction: { mode: 'nearest', intersect: false },
           plugins: {
-            legend: { display: true, position: 'bottom', labels: { color: textColor, padding: 12, usePointStyle: true, pointStyle: 'circle', font: { size: 11 } } },
+            legend: { display: true, position: 'bottom', labels: { color: textColor, padding: 12, usePointStyle: true, pointStyle: 'circle', font: { size: chartFontSize }, boxWidth: isMobile ? 8 : 12 } },
             tooltip: Object.assign({}, defaultTooltip, {
               callbacks: { label: function(ctx) { return ctx.dataset.label + ': ' + ctx.parsed.y + ' kg'; } }
             })
           },
           scales: {
             x: {
-              ticks: { color: textColor, font: { size: 10 }, maxTicksLimit: 8, maxRotation: 0 },
+              ticks: { color: textColor, font: { size: chartFontSize }, maxTicksLimit: chartTicksLimit, maxRotation: 45 },
               grid: { display: false }
             },
             y: {
               beginAtZero: false,
-              ticks: { callback: function(v) { return v + ' kg'; }, color: textColor, font: { size: 11 } },
+              ticks: { callback: function(v) { return v + ' kg'; }, color: textColor, font: { size: chartFontSize } },
               grid: { color: gridColor },
               title: { display: true, text: 'Gewicht (kg)', color: textColor, font: { size: 11 } }
             }
@@ -2694,9 +2761,10 @@ function createProgressCharts(sessions, measurements, weightGoal) {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          aspectRatio: isMobile ? 1.3 : 2,
           interaction: { mode: 'index' },
           plugins: {
-            legend: { display: true, position: 'bottom', labels: { color: textColor, padding: 16, usePointStyle: true } },
+            legend: { display: true, position: 'bottom', labels: { color: textColor, padding: 16, usePointStyle: true, boxWidth: isMobile ? 8 : 12, font: { size: chartFontSize } } },
             tooltip: Object.assign({}, defaultTooltip, {
               callbacks: {
                 label: function(ctx) {
@@ -2708,9 +2776,9 @@ function createProgressCharts(sessions, measurements, weightGoal) {
             })
           },
           scales: {
-            y: { type: 'linear', position: 'left', min: 1, max: 5, title: { display: true, text: 'Energie', color: '#27AE60', font: { size: 11, weight: '600' } }, ticks: { stepSize: 1, color: textColor }, grid: { color: gridColor } },
-            y1: { type: 'linear', position: 'right', min: 0, max: 3, title: { display: true, text: 'Kuitpijn', color: '#E74C3C', font: { size: 11, weight: '600' } }, ticks: { stepSize: 1, color: textColor, callback: function(v) { return ['Geen', 'Beetje', 'Best wel', 'Veel'][v] || v; } }, grid: { display: false } },
-            x: { ticks: { color: textColor, font: { size: 10 }, maxRotation: 0, maxTicksLimit: 10 }, grid: { display: false } }
+            y: { type: 'linear', position: 'left', min: 1, max: 5, title: { display: true, text: 'Energie', color: '#27AE60', font: { size: 11, weight: '600' } }, ticks: { stepSize: 1, color: textColor, font: { size: chartFontSize } }, grid: { color: gridColor } },
+            y1: { type: 'linear', position: 'right', min: 0, max: 3, title: { display: true, text: 'Kuitpijn', color: '#E74C3C', font: { size: 11, weight: '600' } }, ticks: { stepSize: 1, color: textColor, font: { size: chartFontSize }, callback: function(v) { return ['Geen', 'Beetje', 'Best wel', 'Veel'][v] || v; } }, grid: { display: false } },
+            x: { ticks: { color: textColor, font: { size: chartFontSize }, maxRotation: 45, maxTicksLimit: chartTicksLimit }, grid: { display: false } }
           }
         }
       }));
@@ -2738,14 +2806,15 @@ function createProgressCharts(sessions, measurements, weightGoal) {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          aspectRatio: isMobile ? 1.3 : 2,
           interaction: { mode: 'index', intersect: false },
           plugins: {
-            legend: { display: true, position: 'bottom', labels: { color: textColor, padding: 12, usePointStyle: true } },
+            legend: { display: true, position: 'bottom', labels: { color: textColor, padding: 12, usePointStyle: true, boxWidth: isMobile ? 8 : 12, font: { size: chartFontSize } } },
             tooltip: Object.assign({}, defaultTooltip, { callbacks: { label: function(ctx) { return ctx.dataset.label + ': ' + ctx.parsed.y + ' cm'; } } })
           },
           scales: {
-            y: { beginAtZero: false, ticks: { callback: function(v) { return v + ' cm'; }, color: textColor }, grid: { color: gridColor } },
-            x: { ticks: { color: textColor, font: { size: 10 } }, grid: { display: false } }
+            y: { beginAtZero: false, ticks: { callback: function(v) { return v + ' cm'; }, color: textColor, font: { size: chartFontSize } }, grid: { color: gridColor } },
+            x: { ticks: { color: textColor, font: { size: chartFontSize }, maxRotation: 45, maxTicksLimit: chartTicksLimit }, grid: { display: false } }
           }
         }
       }));
@@ -3142,6 +3211,21 @@ function deleteSession(idx) {
   renderHistory();
 }
 
+function toggleWeekGroup(weekKey) {
+  var content = document.getElementById('weekContent-' + weekKey);
+  var toggle = document.getElementById('weekToggle-' + weekKey);
+  if (!content || !toggle) return;
+
+  var isHidden = content.style.display === 'none';
+  content.style.display = isHidden ? 'block' : 'none';
+  toggle.textContent = isHidden ? '▼' : '▶';
+}
+
+function toggleShowAllWeeks() {
+  setStore('showAllWeeks', true);
+  renderHistory();
+}
+
 function getWeightMessage(measurements, goal) {
   if (measurements.length < 2) {
     return '<div style="font-size:13px;color:var(--text-light);text-align:center;padding:4px 0">Na je volgende weging kan ik je voortgang laten zien.</div>';
@@ -3442,6 +3526,7 @@ function showPage(pageId, btn) {
   window.scrollTo(0, 0);
 
   if (pageId === 'pageHistory') renderHistory();
+  if (pageId === 'pageProfile') renderProfile();
   if (pageId === 'pageAgenda') renderAgenda();
   if (pageId === 'pageTrain') renderToday();
 }
