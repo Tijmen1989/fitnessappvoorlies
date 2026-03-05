@@ -195,7 +195,7 @@ function generateKoppelcode() {
   return code;
 }
 
-// Maak een koppelcode aan en sla op in Firestore
+// Maak een koppelcode aan en sla op in het eigen user-document
 function createKoppelcode() {
   if (!firebaseSyncEnabled || !getSyncUid()) {
     alert('Firebase is nog niet verbonden. Probeer het opnieuw.');
@@ -205,11 +205,11 @@ function createKoppelcode() {
   var code = generateKoppelcode();
   var syncUid = getSyncUid();
 
-  // Sla de code op in Firestore: codes/{code} → { uid, createdAt }
-  firebaseDb.collection('codes').doc(code).set({
-    uid: syncUid,
-    createdAt: new Date().toISOString()
-  }).then(function() {
+  // Sla de code op in het eigen user-document (geen aparte collectie nodig)
+  firebaseDb.collection('users').doc(syncUid).set({
+    _koppelcode: code,
+    _koppelcodeCreatedAt: new Date().toISOString()
+  }, { merge: true }).then(function() {
     localStorage.setItem('lt_koppelcode', code);
     console.log('[Koppelcode] Code aangemaakt:', code);
 
@@ -244,15 +244,14 @@ function useKoppelcode() {
     return;
   }
 
-  // Zoek de code op in Firestore
-  firebaseDb.collection('codes').doc(code).get().then(function(doc) {
-    if (!doc.exists) {
+  // Zoek de code op in alle user-documenten
+  firebaseDb.collection('users').where('_koppelcode', '==', code).get().then(function(snapshot) {
+    if (snapshot.empty) {
       alert('Code niet gevonden. Controleer of je de juiste code hebt.');
       return;
     }
 
-    var data = doc.data();
-    var linkedUid = data.uid;
+    var linkedUid = snapshot.docs[0].id;
 
     if (linkedUid === firebaseUser.uid) {
       alert('Dit is je eigen code — je bent al gekoppeld!');
