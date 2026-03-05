@@ -9,7 +9,7 @@ function setStore(key, val) {
   localStorage.setItem('lt_' + key, JSON.stringify(val));
   // Cloud sync: stuur belangrijke data automatisch naar Firebase
   if (typeof saveToCloud === 'function') {
-    var cloudKeys = ['sessions', 'measurements', 'onboardingDone', 'darkMode', 'startDate', 'weekType', 'calfPainHistory'];
+    var cloudKeys = ['sessions', 'measurements', 'onboardingDone', 'darkMode', 'startDate', 'weekType', 'calfPainHistory', 'weightGoal', 'weekBEnabled', 'phaseOverride', 'remindersEnabled'];
     if (cloudKeys.indexOf(key) !== -1) {
       saveToCloud('lt_' + key, val);
     }
@@ -1448,18 +1448,18 @@ function renderToday() {
 
 function renderRestDay(container, dayOfWeek, motivHtml) {
   var isCycling = [1,4].includes(dayOfWeek);
-  var html = (motivHtml || '') + '<div class="card"><div class="rest-day-msg">';
-  html += '<div class="emoji">' + (isCycling ? '\uD83D\uDEB4' : '\uD83D\uDE0C') + '</div>';
-  html += '<h2>' + (isCycling ? 'Fietsdag' : 'Rustdag') + '</h2>';
+  var html = (motivHtml || '') + '<div class="card" style="padding-bottom:4px"><div class="rest-day-msg" style="padding:12px 16px 8px">';
+  html += '<div style="font-size:32px;margin-bottom:4px">' + (isCycling ? '\uD83D\uDEB4' : '\uD83D\uDE0C') + '</div>';
+  html += '<h2 style="margin:0 0 4px;font-size:18px">' + (isCycling ? 'Fietsdag' : 'Rustdag') + '</h2>';
   if (isCycling) {
-    html += '<p>Vandaag fiets je naar school en terug \u2014 dat is al \u00b130 min cardio.</p>';
-    html += '<div style="margin-top:12px;padding:10px 14px;background:rgba(39,174,96,0.06);border-radius:10px;font-size:13px;color:var(--text);line-height:1.5">';
-    html += '\uD83D\uDEB6 <strong>Beweegadvies:</strong> Probeer vandaag ook even te wandelen \u2014 20\u201330 minuten (\u00b12.000\u20133.000 stappen) is al prima. Bijv. een rondje met Milou, of even naar de winkel.';
+    html += '<p style="margin:0 0 8px;font-size:13px">Vandaag fiets je naar school en terug \u2014 dat is al \u00b130 min cardio.</p>';
+    html += '<div style="padding:8px 12px;background:rgba(39,174,96,0.06);border-radius:8px;font-size:12px;color:var(--text);line-height:1.4">';
+    html += '\uD83D\uDEB6 <strong>Beweegadvies:</strong> Probeer ook 20\u201330 min te wandelen (\u00b12.000\u20133.000 stappen). Bijv. een rondje met Milou.';
     html += '</div>';
   } else {
-    html += '<p>Vandaag geen zwaar programma. Licht bewegen of stretchen helpt je lichaam sneller herstellen.</p>';
-    html += '<div style="margin-top:12px;padding:10px 14px;background:rgba(39,174,96,0.06);border-radius:10px;font-size:13px;color:var(--text);line-height:1.5">';
-    html += '\uD83D\uDEB6 <strong>Beweegadvies:</strong> Probeer vandaag 30\u201345 minuten te wandelen (\u00b13.000\u20134.500 stappen). Goed voor herstel en vetverbranding \u2014 een wandeling buiten of op de loopband.';
+    html += '<p style="margin:0 0 8px;font-size:13px">Licht bewegen of stretchen helpt je lichaam sneller herstellen.</p>';
+    html += '<div style="padding:8px 12px;background:rgba(39,174,96,0.06);border-radius:8px;font-size:12px;color:var(--text);line-height:1.4">';
+    html += '\uD83D\uDEB6 <strong>Beweegadvies:</strong> Probeer 30\u201345 min te wandelen (\u00b13.000\u20134.500 stappen). Goed voor herstel en vetverbranding.';
     html += '</div>';
   }
   html += '</div></div>';
@@ -1470,69 +1470,46 @@ function renderRestDay(container, dayOfWeek, motivHtml) {
     html += '<div class="recovery-warning">' + smartTip + '</div>';
   }
 
-  // Kuit-tips op fietsdagen
+  // Compacte actieknoppen
+  html += '<div style="display:flex;gap:8px;margin:8px 16px">';
+  html += '<button class="start-btn-primary" onclick="startLoopbandWandelen()" style="flex:1;margin:0;padding:10px;font-size:13px">\uD83D\uDEB6 Loopband wandelen</button>';
+  html += '<button class="start-btn-primary" onclick="toggleStretchRoutineCompact()" style="flex:1;margin:0;padding:10px;font-size:13px;background:var(--text-light)">\uD83E\uDDD8 Stretchen</button>';
+  html += '</div>';
+
+  // Kuit-tips op fietsdagen (compact)
   if (isCycling) {
-    html += '<div class="card kuit-tips-card">';
-    html += '<div class="kuit-tips-header" onclick="toggleKuitTips(this)" style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:4px 0">';
-    html += '<span>\uD83E\uDDB5</span><span style="font-weight:600;font-size:14px">Tips tegen kuitpijn na het fietsen</span>';
-    html += '<span class="kuit-arrow" style="margin-left:auto;font-size:12px;color:var(--text-light)">\u25BC</span></div>';
-    html += '<div class="kuit-tips-body" style="display:none;margin-top:12px;font-size:13px;color:var(--text-light);line-height:1.6">';
-    html += '<p style="margin:0 0 8px"><strong>Zadelhoogte:</strong> Hiel op het pedaal in de laagste stand \u2192 been net gestrekt. Te laag = kuiten overbelasten.</p>';
-    html += '<p style="margin:0 0 8px"><strong>Voetpositie:</strong> Trap met de bal van je voet, niet met je tenen.</p>';
-    html += '<p style="margin:0 0 8px"><strong>Cadans:</strong> Liever lichter verzet en sneller trappen (70\u201390 rpm) dan zwaar en langzaam.</p>';
-    html += '<p style="margin:0 0 8px"><strong>Schoenen:</strong> Stevigere zool = minder kuitwerk. Zachte slippers vermijden.</p>';
-    html += '<p style="margin:0 0 12px"><strong>Na het fietsen:</strong> 30 sec kuiten stretchen per been (voorvoet op traptrede, hiel omlaag).</p>';
-    html += '<p style="margin:0;padding:10px;background:var(--card);border-radius:8px;border:1px solid var(--border)"><strong>\uD83C\uDFCB\uFE0F Kuit-oefeningetje (2 min/dag):</strong><br>';
-    html += 'Ga met je voorvoeten op een traptrede staan (hielen hangen vrij). Laat je hielen langzaam zakken tot je een rek voelt in je kuiten. Duw daarna omhoog op je tenen \u2014 dit mag met beide benen tegelijk. Doe dit 2\u00d78 per been. Het mag "trekken" maar niet steken.</p>';
+    html += '<div style="margin:4px 16px">';
+    html += '<button onclick="toggleKuitTips(this)" style="background:none;border:none;color:var(--primary-light);font-size:12px;cursor:pointer;padding:4px 0">\uD83E\uDDB5 Tips tegen kuitpijn \u25BC</button>';
+    html += '<div class="kuit-tips-body" style="display:none;margin-top:6px;font-size:12px;color:var(--text-light);line-height:1.5">';
+    html += '<p style="margin:0 0 4px"><strong>Zadelhoogte:</strong> Hiel op pedaal \u2192 been net gestrekt.</p>';
+    html += '<p style="margin:0 0 4px"><strong>Voetpositie:</strong> Trap met de bal van je voet.</p>';
+    html += '<p style="margin:0 0 4px"><strong>Cadans:</strong> Lichter verzet, sneller trappen (70\u201390 rpm).</p>';
+    html += '<p style="margin:0 0 4px"><strong>Na het fietsen:</strong> 30 sec kuiten stretchen per been.</p>';
     html += '</div></div>';
   }
 
-  // Licht bewegen optie (altijd beschikbaar)
-  html += '<div class="card" style="margin:12px 16px">';
-  html += '<div class="card-header"><span class="icon">\uD83D\uDEB6\u200D\u2640\uFE0F</span><div style="flex:1">';
-  html += '<div style="font-size:15px;font-weight:600">Licht bewegen</div>';
-  html += '<div style="font-size:12px;color:var(--text-light)">Actief herstellen is beter dan stilzitten</div>';
-  html += '</div></div>';
-  html += '<div style="padding:12px 16px;font-size:13px;color:var(--text-light);line-height:1.6">';
-  html += 'Licht bewegen helpt je spieren herstellen. Ga 15\u201330 minuten op de loopband wandelen (5\u20136 km/u), rustig fietsen, of maak een wandeling buiten. Houd het ontspannen \u2014 je moet gewoon kunnen praten.';
-  html += '</div>';
-  html += '<div style="padding:0 16px 12px">';
-  html += '<button class="start-btn-primary" onclick="startLoopbandWandelen()" style="width:100%;margin:0">Start loopband wandelen</button>';
-  html += '</div></div>';
-
-  // Stretch routine
-  html += '<div class="card" style="margin:12px 16px">';
-  html += '<div class="card-header" onclick="toggleStretchRoutine(this)" style="cursor:pointer">';
-  html += '<span class="icon">\uD83E\uDDD8</span><div style="flex:1">';
-  html += '<div style="font-size:15px;font-weight:600">5-minuten stretch routine</div>';
-  html += '<div style="font-size:12px;color:var(--text-light)">Houd je lichaam soepel op rustdagen</div>';
-  html += '</div><span class="stretch-arrow" style="font-size:12px;color:var(--text-light)">\u25BC</span></div>';
-  html += '<div class="stretch-body" style="display:none">';
-
+  // Stretch routine (verborgen, wordt getoond via knop)
+  html += '<div id="stretchRoutineCompact" style="display:none;margin:8px 16px">';
+  html += '<div class="card" style="margin:0">';
   STRETCH_ROUTINES.forEach(function(s, idx) {
-    html += '<div class="stretch-item" style="padding:12px 16px;border-top:1px solid var(--border)">';
-    html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">';
-    html += '<span style="font-size:13px;font-weight:700;color:var(--primary);min-width:20px">' + (idx + 1) + '</span>';
-    html += '<div style="flex:1"><div style="font-weight:600;font-size:14px">' + s.name + '</div>';
-    html += '<div style="font-size:12px;color:var(--text-light)">' + s.duur + ' sec' + (s.perKant ? ' per kant' : '') + '</div></div>';
-    html += '<button class="stretch-video-btn" onclick="toggleStretchDetail(\'' + s.id + '\')" style="background:none;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--primary);cursor:pointer">Uitleg</button>';
+    html += '<div style="padding:8px 12px;border-top:' + (idx === 0 ? 'none' : '1px solid var(--border)') + ';display:flex;align-items:center;gap:8px">';
+    html += '<span style="font-size:12px;font-weight:700;color:var(--primary);min-width:16px">' + (idx + 1) + '</span>';
+    html += '<div style="flex:1;font-size:13px">' + s.name + ' <span style="color:var(--text-light)">(' + s.duur + 's' + (s.perKant ? '/kant' : '') + ')</span></div>';
+    html += '<button onclick="toggleStretchDetail(\'' + s.id + '\')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--primary);cursor:pointer">?</button>';
     html += '</div>';
-    html += '<div id="stretchDetail_' + s.id + '" style="display:none;margin-top:8px;margin-left:30px">';
+    html += '<div id="stretchDetail_' + s.id + '" style="display:none;padding:4px 12px 8px 36px">';
     if (s.videoUrl) {
-      html += '<div style="text-align:center;margin-bottom:8px"><video class="exercise-video" src="' + s.videoUrl + '" autoplay loop muted playsinline style="max-width:280px;border-radius:10px" onerror="this.parentElement.style.display=\'none\'"></video></div>';
+      html += '<div style="text-align:center;margin-bottom:4px"><video class="exercise-video" src="' + s.videoUrl + '" autoplay loop muted playsinline style="max-width:200px;border-radius:8px" onerror="this.parentElement.style.display=\'none\'"></video></div>';
     }
-    html += '<p style="font-size:13px;color:var(--text-light);line-height:1.5;margin:0 0 6px">' + s.instruction + '</p>';
-    html += '<div style="font-size:12px;color:var(--success)">\u2714\uFE0F ' + s.focus + '</div>';
-    html += '</div>';
+    html += '<p style="font-size:12px;color:var(--text-light);line-height:1.4;margin:0">' + s.instruction + '</p>';
     html += '</div>';
   });
-
-  html += '<div style="padding:12px 16px;border-top:1px solid var(--border)">';
-  html += '<button class="start-btn-primary" onclick="startStretchTimer()" style="width:100%;margin:0">Start stretch timer (\u00b15 min)</button>';
+  html += '<div style="padding:8px 12px;border-top:1px solid var(--border)">';
+  html += '<button class="start-btn-primary" onclick="startStretchTimer()" style="width:100%;margin:0;padding:8px;font-size:13px">Start stretch timer (\u00b15 min)</button>';
   html += '</div>';
   html += '</div></div>';
 
-  html += '<button class="vrije-training-btn" onclick="openVrijeTraining()">Toch zin om te trainen?</button>';
+  html += '<button class="vrije-training-btn" onclick="openVrijeTraining()" style="margin:8px 16px;padding:10px;font-size:13px">Toch zin om te trainen?</button>';
   container.innerHTML = html;
 }
 
@@ -1753,6 +1730,13 @@ function toggleStretchRoutine(headerEl) {
   } else {
     body.style.display = 'none';
     arrow.textContent = '\u25BC';
+  }
+}
+
+function toggleStretchRoutineCompact() {
+  var el = document.getElementById('stretchRoutineCompact');
+  if (el) {
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
   }
 }
 
@@ -2142,6 +2126,27 @@ function renderHistory() {
     if (extras.length > 0) {
       html += '<div style="font-size:12px;padding:0 16px 12px;color:var(--text-light)">' + extras.join(' \u00b7 ') + '</div>';
     }
+
+    // Alle metingen overzicht (inklapbaar)
+    if (measurements.length > 1) {
+      html += '<div style="padding:0 16px 12px">';
+      html += '<button onclick="toggleMetingenLijst(this)" style="background:none;border:none;color:var(--primary-light);font-size:13px;cursor:pointer;padding:4px 0">Alle metingen (' + measurements.length + ') \u25BC</button>';
+      html += '<div class="metingen-lijst" style="display:none;margin-top:8px">';
+      measurements.slice().reverse().forEach(function(m, ri) {
+        var idx = measurements.length - 1 - ri;
+        var d = new Date(m.date);
+        var details = m.weight + ' kg';
+        if (m.waist) details += ' \u00b7 T: ' + m.waist + ' cm';
+        if (m.hip) details += ' \u00b7 H: ' + m.hip + ' cm';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">';
+        html += '<div><strong>' + formatDateNL(d) + '</strong> — ' + details + '</div>';
+        html += '<div style="display:flex;gap:6px">';
+        html += '<button onclick="editMeasurement(' + idx + ')" style="background:none;border:none;color:var(--primary-light);font-size:16px;cursor:pointer;padding:2px 6px" title="Bewerken">\u270F\uFE0F</button>';
+        html += '<button onclick="deleteMeasurement(' + idx + ')" style="background:none;border:none;color:#e74c3c;font-size:16px;cursor:pointer;padding:2px 6px" title="Verwijderen">\uD83D\uDDD1\uFE0F</button>';
+        html += '</div></div>';
+      });
+      html += '</div></div>';
+    }
   } else {
     html += '<div style="padding:14px 18px;color:var(--text-light);font-size:13px">Nog geen metingen. Weeg jezelf en voeg je eerste meting toe!</div>';
   }
@@ -2221,7 +2226,8 @@ function renderHistory() {
   if (sessions.length === 0) {
     html += '<div class="history-empty"><div class="emoji">\uD83D\uDCDD</div><p>Nog geen trainingen.<br>Na je eerste training verschijnt hier je geschiedenis.</p></div>';
   } else {
-    sessions.slice().reverse().forEach(function(s) {
+    sessions.slice().reverse().forEach(function(s, ri) {
+      var sIdx = sessions.length - 1 - ri;
       var d = new Date(s.date);
       var stats = '';
       if (s.exercises) {
@@ -2235,8 +2241,9 @@ function renderHistory() {
         if (s.feedback.energy) feedbackStr += energyEmojis[s.feedback.energy] + ' ';
         if (s.feedback.calfPain !== null && s.feedback.calfPain !== undefined && s.feedback.calfPain > 0) feedbackStr += '\uD83E\uDDB5' + s.feedback.calfPain + '/3';
       }
-
-      html += '<div class="history-item">';
+      html += '<div class="history-item" style="position:relative">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:flex-start">';
+      html += '<div style="flex:1">';
       html += '<div class="history-date">' + formatDateNL(d) + '</div>';
       html += '<div class="history-type">' + (s.name || s.type);
       if (feedbackStr) html += ' <span style="font-size:12px">' + feedbackStr + '</span>';
@@ -2244,6 +2251,8 @@ function renderHistory() {
       if (stats) html += '<div class="history-stats">' + stats + '</div>';
       if (s.feedback && s.feedback.note) html += '<div style="font-size:12px;color:var(--text-light);font-style:italic;margin-top:2px">\u201C' + s.feedback.note + '\u201D</div>';
       html += '</div>';
+      html += '<button onclick="deleteSession(' + sIdx + ')" style="background:none;border:none;color:#e74c3c;font-size:14px;cursor:pointer;padding:4px 6px;opacity:0.5" title="Verwijderen">\uD83D\uDDD1\uFE0F</button>';
+      html += '</div></div>';
     });
   }
   html += '</div></div>';
@@ -2690,6 +2699,66 @@ function saveMeasurement() {
   document.getElementById('inputWeight').value = '';
   document.getElementById('inputWaist').value = '';
   document.getElementById('inputHip').value = '';
+  renderHistory();
+}
+
+// ── METINGEN BEHEER ──
+function toggleMetingenLijst(btn) {
+  var list = btn.parentElement.querySelector('.metingen-lijst');
+  if (list.style.display === 'none') {
+    list.style.display = 'block';
+    btn.textContent = btn.textContent.replace('\u25BC', '\u25B2');
+  } else {
+    list.style.display = 'none';
+    btn.textContent = btn.textContent.replace('\u25B2', '\u25BC');
+  }
+}
+
+function editMeasurement(idx) {
+  var measurements = getStore('measurements', []);
+  var m = measurements[idx];
+  if (!m) return;
+
+  var newWeight = prompt('Gewicht (kg):', m.weight);
+  if (newWeight === null) return;
+  newWeight = parseFloat(newWeight);
+  if (!newWeight || newWeight < 30 || newWeight > 300) { alert('Ongeldig gewicht.'); return; }
+
+  var newWaist = prompt('Tailleomtrek (cm) — laat leeg om over te slaan:', m.waist || '');
+  var newHip = prompt('Heupomtrek (cm) — laat leeg om over te slaan:', m.hip || '');
+
+  measurements[idx].weight = newWeight;
+  measurements[idx].waist = newWaist ? parseFloat(newWaist) : null;
+  measurements[idx].hip = newHip ? parseFloat(newHip) : null;
+
+  setStore('measurements', measurements);
+  renderHistory();
+}
+
+function deleteMeasurement(idx) {
+  var measurements = getStore('measurements', []);
+  var m = measurements[idx];
+  if (!m) return;
+  var d = new Date(m.date);
+
+  if (!confirm('Meting van ' + formatDateNL(d) + ' verwijderen?\n(' + m.weight + ' kg)')) return;
+
+  measurements.splice(idx, 1);
+  setStore('measurements', measurements);
+  renderHistory();
+}
+
+// ── SESSIES BEHEER ──
+function deleteSession(idx) {
+  var sessions = getStore('sessions', []);
+  var s = sessions[idx];
+  if (!s) return;
+  var d = new Date(s.date);
+
+  if (!confirm('Training van ' + formatDateNL(d) + ' verwijderen?\n(' + (s.name || s.type) + ')')) return;
+
+  sessions.splice(idx, 1);
+  setStore('sessions', sessions);
   renderHistory();
 }
 
