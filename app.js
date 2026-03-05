@@ -2298,21 +2298,64 @@ function renderHistory() {
   html += '</div>';
   html += '</div></div>';
 
-  // ── CLOUD SYNC STATUS ──
+  // ── CLOUD SYNC & KOPPELCODE ──
   html += '<div class="card">';
-  html += '<div class="card-header"><span class="icon">\u2601\uFE0F</span> Cloud backup</div>';
+  html += '<div class="card-header"><span class="icon">\u2601\uFE0F</span> Cloud & Multi-device</div>';
   html += '<div style="padding:12px 16px">';
   if (typeof getCloudSyncStatus === 'function') {
     var syncStatus = getCloudSyncStatus();
     if (syncStatus.enabled) {
       var lastSync = syncStatus.lastSync ? new Date(syncStatus.lastSync).toLocaleString('nl-NL') : 'nog niet';
+
+      // ── Sync status ──
       html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
       html += '<span style="color:var(--success);font-size:18px">\u25CF</span>';
-      html += '<span style="font-size:14px;font-weight:600;color:var(--success)">Actief</span>';
+      html += '<span style="font-size:14px;font-weight:600;color:var(--success)">Cloud actief</span>';
       html += '</div>';
-      html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:8px">Je data wordt automatisch opgeslagen in de cloud. Telefoon kwijt of browser gewist? Geen probleem \u2014 alles wordt hersteld.</p>';
-      html += '<p style="font-size:12px;color:var(--text-light)">Laatste sync: ' + lastSync + '</p>';
-      html += '<button class="save-btn" onclick="fullSyncToCloud()" style="margin-top:8px;font-size:13px">\uD83D\uDD04 Nu synchroniseren</button>';
+      html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:4px">Je data wordt automatisch gesynchroniseerd.</p>';
+      html += '<p style="font-size:12px;color:var(--text-light);margin-bottom:12px">Laatste sync: ' + lastSync + '</p>';
+      html += '<button class="save-btn" onclick="fullSyncToCloud()" style="font-size:13px;margin-bottom:16px">\uD83D\uDD04 Nu synchroniseren</button>';
+
+      // ── Koppelcode sectie ──
+      html += '<div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">';
+      html += '<div style="font-size:14px;font-weight:600;margin-bottom:6px">\uD83D\uDD17 Apparaten koppelen</div>';
+
+      if (typeof isDeviceLinked === 'function' && isDeviceLinked()) {
+        // Gekoppeld — toon status
+        var activeCode = typeof getActiveKoppelcode === 'function' ? getActiveKoppelcode() : '';
+        html += '<div style="background:var(--success-bg, #e8f5e9);border-radius:10px;padding:12px;margin-bottom:10px">';
+        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">';
+        html += '<span style="font-size:16px">\u2705</span>';
+        html += '<span style="font-size:13px;font-weight:600;color:var(--success)">Gekoppeld</span>';
+        html += '</div>';
+        if (activeCode) {
+          html += '<p style="font-size:12px;color:var(--text-light);margin-bottom:0">Koppelcode: <strong style="font-family:monospace;letter-spacing:2px">' + activeCode + '</strong></p>';
+        }
+        html += '</div>';
+        html += '<p style="font-size:12px;color:var(--text-light);margin-bottom:8px">Dit apparaat deelt data met een ander apparaat. Alle trainingen worden automatisch gesynchroniseerd.</p>';
+        html += '<button class="save-btn" onclick="unlinkDevice()" style="font-size:12px;background:var(--text-light);padding:8px 14px">\u274C Ontkoppelen</button>';
+      } else {
+        // Niet gekoppeld — toon opties
+        html += '<p style="font-size:12px;color:var(--text-light);margin-bottom:12px">Gebruik dezelfde trainingsdata op meerdere apparaten (bijv. laptop \u0026 telefoon).</p>';
+
+        // Stap 1: Code genereren
+        html += '<div style="background:var(--card-bg, #f8f9fa);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px">';
+        html += '<div style="font-size:12px;font-weight:600;margin-bottom:6px">Stap 1 \u2014 Op dit apparaat:</div>';
+        html += '<button class="save-btn" onclick="createKoppelcode()" style="font-size:13px;width:100%">\uD83D\uDD11 Genereer koppelcode</button>';
+        html += '<div id="koppelcodeDisplay"></div>';
+        html += '</div>';
+
+        // Stap 2: Code invoeren
+        html += '<div style="background:var(--card-bg, #f8f9fa);border:1px solid var(--border);border-radius:10px;padding:12px">';
+        html += '<div style="font-size:12px;font-weight:600;margin-bottom:6px">Stap 2 \u2014 Op het andere apparaat:</div>';
+        html += '<div style="display:flex;gap:8px">';
+        html += '<input id="koppelcodeInput" type="text" inputmode="numeric" maxlength="6" placeholder="6-cijferige code" style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:16px;font-family:monospace;letter-spacing:4px;text-align:center;background:var(--bg);color:var(--text)">';
+        html += '<button class="save-btn" onclick="useKoppelcode()" style="font-size:13px;padding:10px 16px">\u2192 Koppel</button>';
+        html += '</div>';
+        html += '</div>';
+      }
+      html += '</div>'; // einde koppelcode sectie
+
     } else {
       html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
       html += '<span style="color:var(--warning);font-size:18px">\u25CF</span>';

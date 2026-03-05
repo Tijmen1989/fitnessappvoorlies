@@ -1,12 +1,12 @@
 // ================================================================
-// FIREBASE CLOUD SYNC
+// FIREBASE CLOUD SYNC + KOPPELCODE MULTI-DEVICE
 // ================================================================
 // Automatische cloud backup voor trainingsdata.
 // Alle data wordt lokaal opgeslagen (localStorage) EN naar Firebase gestuurd.
 // Bij app-start: als lokaal leeg is maar cloud data heeft → auto-herstel.
 //
-// ▶ STAP: Vervang de firebaseConfig hieronder met jouw eigen config
-//   uit de Firebase Console → Project Settings → Web App.
+// KOPPELCODE: Genereer een 6-cijferige code op apparaat 1,
+// voer die in op apparaat 2 → beide delen dezelfde data.
 // ================================================================
 
 var firebaseConfig = {
@@ -26,9 +26,15 @@ var firebaseSyncEnabled = false;
 var firebaseSyncQueue = [];
 var firebaseIsSyncing = false;
 
+// De UID die we gebruiken voor data — eigen UID of gekoppelde UID
+function getSyncUid() {
+  var linked = localStorage.getItem('lt_linkedUid');
+  if (linked) return linked;
+  return firebaseUser ? firebaseUser.uid : null;
+}
+
 function initFirebase() {
   try {
-    // Check of config ingevuld is
     if (firebaseConfig.apiKey === "VERVANG_MET_JOUW_KEY") {
       console.log('[CloudSync] Firebase config nog niet ingevuld — cloud sync uitgeschakeld.');
       return;
@@ -37,34 +43,28 @@ function initFirebase() {
     firebaseApp = firebase.initializeApp(firebaseConfig);
     firebaseDb = firebase.firestore();
 
-    // Offline persistence inschakelen (data beschikbaar zonder internet)
     firebaseDb.enablePersistence({ synchronizeTabs: true }).catch(function(err) {
       console.log('[CloudSync] Persistence niet beschikbaar:', err.code);
     });
 
-    // Anoniem inloggen
     firebase.auth().signInAnonymously().then(function(result) {
       firebaseUser = result.user;
       firebaseSyncEnabled = true;
       console.log('[CloudSync] Verbonden als:', firebaseUser.uid);
+      console.log('[CloudSync] Sync UID:', getSyncUid());
 
-      // Sla user ID lokaal op zodat we altijd dezelfde account gebruiken
       var storedUid = localStorage.getItem('lt_firebaseUid');
       if (!storedUid) {
         localStorage.setItem('lt_firebaseUid', firebaseUser.uid);
       }
 
-      // Sync queue verwerken (als er saves waren voordat Firebase klaar was)
       processFirebaseSyncQueue();
-
-      // Check of we data moeten herstellen vanuit de cloud
       checkCloudRestore();
 
     }).catch(function(err) {
       console.log('[CloudSync] Aanmelden mislukt:', err.message);
     });
 
-    // Luister naar auth state changes
     firebase.auth().onAuthStateChanged(function(user) {
       if (user) {
         firebaseUser = user;
@@ -81,13 +81,12 @@ function initFirebase() {
 
 // ── Cloud opslaan ──
 function saveToCloud(key, value) {
-  if (!firebaseSyncEnabled || !firebaseUser) {
-    // Queue het voor later
+  if (!firebaseSyncEnabled || !getSyncUid()) {
     firebaseSyncQueue.push({ key: key, value: value });
     return;
   }
 
-  var docRef = firebaseDb.collection('users').doc(firebaseUser.uid);
+  var docRef = firebaseDb.collection('users').doc(getSyncUid());
   var update = {};
   update[key] = value;
   update['lastSyncedAt'] = new Date().toISOString();
@@ -102,12 +101,12 @@ function saveToCloud(key, value) {
 
 // ── Volledige sync (alle data naar cloud) ──
 function fullSyncToCloud() {
-  if (!firebaseSyncEnabled || !firebaseUser) return;
+  if (!firebaseSyncEnabled || !getSyncUid()) return;
 
   var allData = {};
   for (var i = 0; i < localStorage.length; i++) {
     var key = localStorage.key(i);
-    if (key.startsWith('lt_') && key !== 'lt_firebaseUid') {
+    if (key.startsWith('lt_') && key !== 'lt_firebaseUid' && key !== 'lt_linkedUid' && key !== 'lt_koppelcode') {
       try {
         allData[key] = JSON.parse(localStorage.getItem(key));
       } catch(e) {
@@ -118,7 +117,7 @@ function fullSyncToCloud() {
   allData['lastSyncedAt'] = new Date().toISOString();
   allData['lastFullSync'] = new Date().toISOString();
 
-  var docRef = firebaseDb.collection('users').doc(firebaseUser.uid);
+  var docRef = firebaseDb.collection('users').doc(getSyncUid());
   docRef.set(allData, { merge: true }).then(function() {
     console.log('[CloudSync] Volledige sync geslaagd');
     updateSyncIndicator(true);
@@ -132,10 +131,8 @@ function fullSyncToCloud() {
 // ── Queue verwerken ──
 function processFirebaseSyncQueue() {
   if (firebaseSyncQueue.length === 0) return;
-
   var queue = firebaseSyncQueue.slice();
   firebaseSyncQueue = [];
-
   queue.forEach(function(item) {
     saveToCloud(item.key, item.value);
   });
@@ -143,18 +140,16 @@ function processFirebaseSyncQueue() {
 
 // ── Cloud data herstellen ──
 function checkCloudRestore() {
-  if (!firebaseSyncEnabled || !firebaseUser) return;
+  if (!firebaseSyncEnabled || !getSyncUid()) return;
 
   var localSessions = getStore('sessions', []);
 
-  // Als er lokaal al data is, doe alleen een sync NAAR de cloud
   if (localSessions.length > 0) {
     fullSyncToCloud();
     return;
   }
 
-  // Lokaal is leeg — probeer te herstellen vanuit cloud
-  var docRef = firebaseDb.collection('users').doc(firebaseUser.uid);
+  var docRef = firebaseDb.collection('users').doc(getSyncUid());
   docRef.get().then(function(doc) {
     if (!doc.exists) {
       console.log('[CloudSync] Geen cloud data gevonden.');
@@ -167,7 +162,6 @@ function checkCloudRestore() {
       return;
     }
 
-    // Er is cloud data maar lokaal is leeg — herstel!
     console.log('[CloudSync] Cloud data gevonden! Herstellen...');
 
     var restored = 0;
@@ -180,7 +174,6 @@ function checkCloudRestore() {
 
     console.log('[CloudSync] ' + restored + ' items hersteld vanuit cloud');
 
-    // Herlaad de app om herstelde data te tonen
     alert('Je trainingsdata is hersteld vanuit de cloud! (' + (cloudData['lt_sessions'] ? cloudData['lt_sessions'].length : 0) + ' trainingen). De app wordt herladen.');
     location.reload();
 
@@ -189,11 +182,143 @@ function checkCloudRestore() {
   });
 }
 
+// ================================================================
+// KOPPELCODE SYSTEEM — Multi-device sync
+// ================================================================
+
+// Genereer een willekeurige 6-cijferige code
+function generateKoppelcode() {
+  var code = '';
+  for (var i = 0; i < 6; i++) {
+    code += Math.floor(Math.random() * 10);
+  }
+  return code;
+}
+
+// Maak een koppelcode aan en sla op in Firestore
+function createKoppelcode() {
+  if (!firebaseSyncEnabled || !getSyncUid()) {
+    alert('Firebase is nog niet verbonden. Probeer het opnieuw.');
+    return;
+  }
+
+  var code = generateKoppelcode();
+  var syncUid = getSyncUid();
+
+  // Sla de code op in Firestore: codes/{code} → { uid, createdAt }
+  firebaseDb.collection('codes').doc(code).set({
+    uid: syncUid,
+    createdAt: new Date().toISOString()
+  }).then(function() {
+    localStorage.setItem('lt_koppelcode', code);
+    console.log('[Koppelcode] Code aangemaakt:', code);
+
+    // Toon de code
+    var el = document.getElementById('koppelcodeDisplay');
+    if (el) {
+      el.innerHTML = '<div style="text-align:center;padding:16px">' +
+        '<div style="font-size:11px;color:var(--text-light);margin-bottom:8px">Jouw koppelcode:</div>' +
+        '<div style="font-size:32px;font-weight:700;letter-spacing:8px;color:var(--primary);font-family:monospace">' + code + '</div>' +
+        '<div style="font-size:12px;color:var(--text-light);margin-top:8px">Voer deze code in op je andere apparaat</div>' +
+        '</div>';
+    }
+  }).catch(function(err) {
+    console.log('[Koppelcode] Aanmaken mislukt:', err.message);
+    alert('Kon de koppelcode niet aanmaken: ' + err.message);
+  });
+}
+
+// Koppel dit apparaat aan een bestaande code
+function useKoppelcode() {
+  if (!firebaseSyncEnabled || !firebaseUser) {
+    alert('Firebase is nog niet verbonden. Probeer het opnieuw.');
+    return;
+  }
+
+  var input = document.getElementById('koppelcodeInput');
+  if (!input) return;
+
+  var code = input.value.trim();
+  if (code.length !== 6 || !/^\d+$/.test(code)) {
+    alert('Voer een geldige 6-cijferige code in.');
+    return;
+  }
+
+  // Zoek de code op in Firestore
+  firebaseDb.collection('codes').doc(code).get().then(function(doc) {
+    if (!doc.exists) {
+      alert('Code niet gevonden. Controleer of je de juiste code hebt.');
+      return;
+    }
+
+    var data = doc.data();
+    var linkedUid = data.uid;
+
+    if (linkedUid === firebaseUser.uid) {
+      alert('Dit is je eigen code — je bent al gekoppeld!');
+      return;
+    }
+
+    // Sla de gekoppelde UID op
+    localStorage.setItem('lt_linkedUid', linkedUid);
+    localStorage.setItem('lt_koppelcode', code);
+    console.log('[Koppelcode] Gekoppeld aan UID:', linkedUid);
+
+    // Haal data op van de gekoppelde account
+    firebaseDb.collection('users').doc(linkedUid).get().then(function(userDoc) {
+      if (!userDoc.exists) {
+        alert('Gekoppeld! Maar er is nog geen data op de andere account.');
+        location.reload();
+        return;
+      }
+
+      var cloudData = userDoc.data();
+      var restored = 0;
+      Object.keys(cloudData).forEach(function(key) {
+        if (key.startsWith('lt_') && key !== 'lt_firebaseUid') {
+          localStorage.setItem(key, JSON.stringify(cloudData[key]));
+          restored++;
+        }
+      });
+
+      var sessionCount = cloudData['lt_sessions'] ? cloudData['lt_sessions'].length : 0;
+      console.log('[Koppelcode] ' + restored + ' items hersteld van gekoppeld account');
+      alert('Gekoppeld! ' + sessionCount + ' trainingen geladen. De app wordt herladen.');
+      location.reload();
+
+    }).catch(function(err) {
+      console.log('[Koppelcode] Data ophalen mislukt:', err.message);
+      alert('Gekoppeld, maar data ophalen mislukt: ' + err.message);
+    });
+
+  }).catch(function(err) {
+    console.log('[Koppelcode] Code opzoeken mislukt:', err.message);
+    alert('Fout bij het opzoeken van de code: ' + err.message);
+  });
+}
+
+// Ontkoppel dit apparaat
+function unlinkDevice() {
+  if (!confirm('Weet je zeker dat je wilt ontkoppelen? Je lokale data blijft behouden.')) return;
+  localStorage.removeItem('lt_linkedUid');
+  localStorage.removeItem('lt_koppelcode');
+  console.log('[Koppelcode] Ontkoppeld');
+  renderHistory();
+}
+
+// Check of we gekoppeld zijn
+function isDeviceLinked() {
+  return !!localStorage.getItem('lt_linkedUid');
+}
+
+function getActiveKoppelcode() {
+  return localStorage.getItem('lt_koppelcode') || null;
+}
+
 // ── Sync status indicator ──
 function updateSyncIndicator(success) {
   var el = document.getElementById('syncIndicator');
   if (!el) {
-    // Maak indicator aan in de topbar
     var topbar = document.getElementById('topbar');
     if (!topbar) return;
     el = document.createElement('div');
@@ -204,14 +329,13 @@ function updateSyncIndicator(success) {
   }
 
   if (success) {
-    el.textContent = '☁️ Synced';
+    el.textContent = '\u2601\uFE0F Synced';
     el.style.color = 'var(--success, #27AE60)';
   } else {
-    el.textContent = '☁️ Offline';
+    el.textContent = '\u2601\uFE0F Offline';
     el.style.color = 'var(--warning, #F39C12)';
   }
 
-  // Fade na 3 seconden
   el.style.opacity = '0.7';
   setTimeout(function() { el.style.opacity = '0.3'; }, 3000);
 }
@@ -228,7 +352,9 @@ function getCloudSyncStatus() {
   return {
     enabled: true,
     lastSync: lastSync,
-    uid: firebaseUser ? firebaseUser.uid : 'onbekend'
+    uid: getSyncUid(),
+    linked: isDeviceLinked(),
+    koppelcode: getActiveKoppelcode()
   };
 }
 
