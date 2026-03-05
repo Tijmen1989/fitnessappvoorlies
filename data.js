@@ -150,6 +150,114 @@ const EXERCISE_DB = {
       focus: 'Billen niet omhoog steken en niet laten doorzakken. Stel je voor dat er een rechte lat op je rug ligt.',
       mistake: 'Adem inhouden. Blijf rustig doorademen. Begin met 20 seconden \u2014 dat is prima.'
     }
+  },
+  // Phase 2 exercises
+  'lat-pulldown': {
+    id: 'lat-pulldown',
+    name: 'Lat pulldown',
+    apparaat: 'Lat pulldown apparaat',
+    reps: '10\u201312',
+    defaultReps: 12,
+    rest: 90,
+    phase: 2,
+    tip: 'Trek de stang naar je borst, niet achter je nek',
+    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-machine-lat-pulldown-front.mp4',
+    instruction: {
+      goal: 'Brede rugspieren (lats) en biceps trainen.',
+      steps: [
+        'Ga zitten en klem je bovenbenen onder de kussens.',
+        'Pak de brede stang vast met een brede grip.',
+        'Trek de stang langzaam naar je bovenborst.',
+        'Laat langzaam en gecontroleerd terugkomen tot je armen bijna gestrekt zijn.'
+      ],
+      focus: 'Denk eraan dat je je ellebogen naar beneden trekt, niet je handen. Schouderbladen naar elkaar toe trekken.',
+      mistake: 'De stang achter je nek trekken of te veel achterover leunen. Houd je bovenlichaam licht achterover (max 15 graden).'
+    }
+  },
+  'cable-row': {
+    id: 'cable-row',
+    name: 'Cable row (zittend)',
+    apparaat: 'Kabel-rij apparaat',
+    reps: '10\u201312',
+    defaultReps: 12,
+    rest: 90,
+    phase: 2,
+    tip: 'Rug recht, trek naar je buik toe',
+    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-machine-seated-cable-row-side.mp4',
+    instruction: {
+      goal: 'Midden van de rug en biceps trainen.',
+      steps: [
+        'Ga zitten met je voeten tegen de steun, knie\u00ebn licht gebogen.',
+        'Pak de handgreep met beide handen vast.',
+        'Trek de greep naar je buik door je ellebogen langs je lichaam te trekken.',
+        'Laat langzaam terugkomen tot je armen gestrekt zijn.'
+      ],
+      focus: 'Rug recht houden, niet naar voren of achteren zwaaien. De beweging komt uit je armen en schouderbladen.',
+      mistake: 'Te veel momentum gebruiken door naar achteren te leunen. Houd je romp stil.'
+    }
+  },
+  'leg-press': {
+    id: 'leg-press',
+    name: 'Leg press',
+    apparaat: 'Leg press apparaat',
+    reps: '10\u201312',
+    defaultReps: 12,
+    rest: 90,
+    phase: 2,
+    tip: 'Voeten op schouderbreedte, niet de knie\u00ebn op slot duwen',
+    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-machine-leg-press-side.mp4',
+    instruction: {
+      goal: 'Bovenbenen en bilspieren trainen.',
+      steps: [
+        'Ga zitten met je rug plat tegen de leuning.',
+        'Plaats je voeten op schouderbreedte op het platform.',
+        'Duw het platform weg tot je benen bijna gestrekt zijn.',
+        'Laat langzaam terugkomen tot je knie\u00ebn op 90 graden staan.'
+      ],
+      focus: 'Knie\u00ebn wijzen dezelfde kant op als je tenen. Duw door je hele voet, niet alleen je tenen.',
+      mistake: 'Knie\u00ebn helemaal op slot duwen of je onderrug van de leuning tillen. Houd altijd een kleine buiging.'
+    }
+  },
+  'side-plank': {
+    id: 'side-plank',
+    name: 'Side plank',
+    apparaat: 'Op de grond',
+    reps: '15\u201320 sec per kant',
+    defaultReps: 0,
+    rest: 60,
+    isPlank: true,
+    phase: 2,
+    tip: 'Heupen omhoog, lichaam in rechte lijn',
+    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-bodyweight-side-plank-side.mp4',
+    instruction: {
+      goal: 'Zijwaartse buikspieren en core sterker maken.',
+      steps: [
+        'Ga op je zij liggen, leun op je onderarm.',
+        'Til je heupen op zodat je lichaam een rechte lijn vormt.',
+        'Houd deze positie aan, wissel daarna van kant.',
+        'Begin met 15 seconden per kant.'
+      ],
+      focus: 'Heupen niet laten doorzakken. Span je buik aan en adem rustig door.',
+      mistake: 'Naar voren of achteren rollen. Houd je lichaam in \u00e9\u00e9n lijn.'
+    }
+  }
+};
+
+// Phase configuration
+var PHASE_CONFIG = {
+  1: {
+    name: 'Fase 1 \u2014 Basis',
+    description: 'Leer de basisoefeningen goed uitvoeren',
+    unlockRequirement: null,
+    krachtBoven: ['chest-press', 'incline-press', 'shoulder-press', 'dumbbell-row', 'plank'],
+    krachtOnder: ['leg-curl', 'leg-ext', 'chest-press', 'shoulder-press', 'plank']
+  },
+  2: {
+    name: 'Fase 2 \u2014 Uitbreiding',
+    description: 'Meer oefeningen en variatie',
+    unlockRequirement: { sessions: 12, weeks: 4 },
+    krachtBoven: ['chest-press', 'incline-press', 'shoulder-press', 'dumbbell-row', 'lat-pulldown', 'plank', 'side-plank'],
+    krachtOnder: ['leg-curl', 'leg-ext', 'leg-press', 'cable-row', 'shoulder-press', 'plank', 'side-plank']
   }
 };
 
@@ -166,9 +274,9 @@ const TRAINING_DATA = {
     id: 'kracht-onder',
     name: 'Kracht: onderlichaam',
     type: 'kracht',
-    warmup: { apparaat: 'Hometrainer', duur: '5\u20138 min', detail: 'Laag tempo, lichte weerstand (recumbent bike mag ook)' },
-    cooldown: '5 min rustig wandelen of stretchen van bovenbenen',
-    exerciseIds: ['leg-ext', 'leg-curl', 'chest-press', 'shoulder-press', 'plank']
+    warmup: { apparaat: 'Loopband', duur: '5\u20138 min', detail: '5.0\u20135.5 km/u, incline 0\u20131% \u2014 rustig wandelen' },
+    cooldown: '5 min rustig wandelen of stretchen van bovenbenen + 30 sec kuiten stretchen per been',
+    exerciseIds: ['leg-curl', 'leg-ext', 'chest-press', 'shoulder-press', 'plank']
   },
   cardioVariatie: {
     id: 'cardio-variatie',
@@ -176,34 +284,15 @@ const TRAINING_DATA = {
     type: 'cardio',
     options: [
       {
-        name: 'Crosstrainer',
+        name: 'Crosstrainer (aanbevolen)',
         totalMin: 45,
+        isPrimary: true,
         phases: [
           { name: 'Warming-up', duur: 5, detail: 'Rustig tempo, weerstand stand 3\u20134', intensity: 'low' },
           { name: 'Hoofddeel', duur: 35, detail: 'Gemiddeld tempo, weerstand stand 4\u20136, praattest = OK', intensity: 'medium' },
           { name: 'Cooldown', duur: 5, detail: 'Rustig tempo, weerstand stand 3\u20134', intensity: 'low' }
         ],
         interval: { normalMin: 3, fastMin: 1, label: 'Elke 10 min optioneel: 1 min iets sneller' }
-      },
-      {
-        name: 'Hometrainer / Recumbent bike',
-        totalMin: 45,
-        phases: [
-          { name: 'Warming-up', duur: 5, detail: '50\u201360 RPM, weerstand stand 2\u20133', intensity: 'low' },
-          { name: 'Hoofddeel', duur: 35, detail: '60\u201370 RPM, weerstand stand 3\u20135', intensity: 'medium' },
-          { name: 'Cooldown', duur: 5, detail: '50\u201360 RPM, weerstand stand 2\u20133', intensity: 'low' }
-        ],
-        interval: { normalMin: 3, fastMin: 1, label: 'Elke 10 min optioneel: 1 min naar 70\u201380 RPM' }
-      },
-      {
-        name: 'Buiten fietsen',
-        totalMin: 50,
-        phases: [
-          { name: 'Warming-up', duur: 5, detail: 'Rustig fietsen, vlak terrein', intensity: 'low' },
-          { name: 'Hoofddeel', duur: 40, detail: 'Comfortabel doortraptempo, weinig heuvels', intensity: 'medium' },
-          { name: 'Cooldown', duur: 5, detail: 'Rustig uitfietsen richting huis', intensity: 'low' }
-        ],
-        interval: null
       },
       {
         name: 'Loopband',
@@ -215,6 +304,45 @@ const TRAINING_DATA = {
           { name: 'Cooldown', duur: 5, detail: '5.5 km/u, incline 1%', intensity: 'low' }
         ],
         interval: null
+      },
+      {
+        name: 'Recumbent bike',
+        totalMin: 40,
+        phases: [
+          { name: 'Warming-up', duur: 5, detail: 'Rustig tempo, weerstand stand 2\u20133', intensity: 'low' },
+          { name: 'Hoofddeel', duur: 30, detail: '60\u201370 RPM, weerstand stand 3\u20135, praattest = OK', intensity: 'medium' },
+          { name: 'Cooldown', duur: 5, detail: 'Rustig tempo, weerstand stand 2\u20133', intensity: 'low' }
+        ],
+        interval: null
+      }
+    ]
+  },
+  loopbandWandelen: {
+    id: 'loopband-wandelen',
+    name: 'Loopband wandelen',
+    type: 'cardio',
+    options: [
+      {
+        name: 'Loopband wandelen',
+        totalMin: 35,
+        isPrimary: true,
+        phases: [
+          { name: 'Warming-up', duur: 5, detail: '5.2\u20135.5 km/u, incline 0\u20131%', intensity: 'low' },
+          { name: 'Hoofddeel', duur: 25, detail: '5.5\u20135.9 km/u, incline 0\u20131% (alleen hoger als kuiten OK zijn)', intensity: 'medium' },
+          { name: 'Cooldown', duur: 5, detail: '5.0\u20135.2 km/u, incline 0%', intensity: 'low' }
+        ],
+        interval: null
+      },
+      {
+        name: 'Loopband met interval',
+        totalMin: 30,
+        phase2Only: true,
+        phases: [
+          { name: 'Warming-up', duur: 5, detail: '5.5 km/u, incline 0\u20131%', intensity: 'low' },
+          { name: 'Intervals', duur: 20, detail: 'Wissel af: 1 min stevig (6.5\u20137.0 km/u) / 2 min rustig (5.5 km/u)', intensity: 'high' },
+          { name: 'Cooldown', duur: 5, detail: '5.0 km/u, incline 0%', intensity: 'low' }
+        ],
+        interval: { fast: 60, slow: 120, fastDetail: '6.5\u20137.0 km/u', slowDetail: '5.5 km/u' }
       }
     ]
   },
@@ -252,6 +380,17 @@ const TRAINING_DATA = {
           { name: 'Cooldown', duur: 5, detail: 'Rustig uitfietsen', intensity: 'low' }
         ],
         interval: null
+      },
+      {
+        name: 'Loopband interval',
+        totalMin: 28,
+        phase2Only: true,
+        phases: [
+          { name: 'Warming-up', duur: 5, detail: '5.5 km/u, incline 1%', intensity: 'low' },
+          { name: 'Intervals', duur: 18, detail: 'Wissel af: 1 min stevig (6.5\u20137.5 km/u) / 2 min rustig (5.5 km/u)', intensity: 'high' },
+          { name: 'Cooldown', duur: 5, detail: '5.0\u20135.5 km/u, incline 0%', intensity: 'low' }
+        ],
+        interval: { fast: 60, slow: 120, fastDetail: '6.5\u20137.5 km/u', slowDetail: '5.5 km/u' }
       }
     ]
   }
@@ -263,14 +402,75 @@ function getExercise(id) {
   return EXERCISE_DB[baseId] || EXERCISE_DB[id] || null;
 }
 
+// ================================================================
+// STRETCH ROUTINES (rustdagen)
+// ================================================================
+var STRETCH_ROUTINES = [
+  {
+    id: 'hamstrings',
+    name: 'Hamstrings stretch',
+    duur: 30,
+    perKant: true,
+    instruction: 'Ga op je rug liggen bij een muur. Strek je benen omhoog tegen de muur, billen zo dicht mogelijk bij de muur. Buig \u00e9\u00e9n been, houd het andere gestrekt. Duw je dij richting de muur tot je een rek voelt. Houd 30 seconden, wissel dan.',
+    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-hamstrings-stretch-variation-1-side.mp4',
+    focus: 'Billen dicht bij de muur, been gestrekt houden'
+  },
+  {
+    id: 'quads',
+    name: 'Bovenbeen stretch',
+    duur: 30,
+    perKant: true,
+    instruction: 'Sta rechtop (houd je ergens aan vast voor balans). Pak je enkel vast en trek je hiel naar je billen. Je knie wijst naar de grond. Houd 30 seconden, wissel dan.',
+    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-quads-stretch-variation-1-side.mp4',
+    focus: 'Knie\u00ebn naast elkaar houden, niet naar buiten'
+  },
+  {
+    id: 'calves',
+    name: 'Kuiten stretch',
+    duur: 30,
+    perKant: true,
+    instruction: 'Zet de bal van je voet tegen de muur, hiel blijft op de grond. Handen op schouderhoogte tegen de muur. Leun langzaam naar voren tot je een rek voelt in je kuit. Houd 30 seconden, wissel dan.',
+    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-calves-stretch-variation-1-side.mp4',
+    focus: 'Knie gestrekt houden, langzaam en gecontroleerd'
+  },
+  {
+    id: 'chest-doorway',
+    name: 'Borst & schouders stretch',
+    duur: 30,
+    perKant: true,
+    instruction: 'Ga bij een muur of deuropening staan. Plaats je arm in een 90-graden hoek tegen de muur. Leun langzaam naar voren tot je een rek voelt in je borst. Houd 30 seconden, draai dan om voor de andere kant.',
+    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-chest-stretch-variation-1-side.mp4',
+    focus: 'Niet te ver doorduwen, rustig ademen'
+  },
+  {
+    id: 'rug-stretch',
+    name: 'Rug stretch (cobra)',
+    duur: 30,
+    perKant: false,
+    instruction: 'Ga op je buik liggen met je onderarmen plat op de grond. Duw je bovenlichaam omhoog door je ellebogen te strekken. Houd 30 seconden en kom langzaam terug.',
+    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-abdominals-stretch-variation-1-side.mp4',
+    focus: 'Schouders laag, kijk recht vooruit, niet te ver doorduwen'
+  },
+  {
+    id: 'glutes',
+    name: 'Billen & heup stretch',
+    duur: 30,
+    perKant: true,
+    instruction: 'Ga op de grond zitten. Breng \u00e9\u00e9n been gebogen voor je, het andere been strek je naar achteren. Strek je arm aan dezelfde kant als je voorste been uit over de grond. Leun voorover tot je een rek voelt in je bil. Houd 30 seconden, wissel dan.',
+    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-glutes-stretch-variation-1-side.mp4',
+    focus: 'Houd je heupen zo recht mogelijk, leun rustig voorover'
+  }
+];
+
 function getSchedule(weekType) {
   var base = {
-    0: 'cardioVariatie',  // Zondag
-    3: 'krachtOnder',     // Woensdag
-    6: 'krachtBoven'      // Zaterdag
+    0: 'cardioVariatie',      // Zondag
+    2: 'loopbandWandelen',    // Dinsdag
+    3: 'krachtOnder',         // Woensdag
+    6: 'krachtBoven'          // Zaterdag
   };
   if (weekType === 'B') {
-    base[5] = 'cardioLicht'; // Vrijdag
+    base[5] = 'cardioLicht';  // Vrijdag (alleen Week B)
   }
   return base;
 }

@@ -14,7 +14,7 @@
 
 <!-- ==================== TOP BAR ==================== -->
 <div class="topbar" id="topbar">
-  <h1>Trainingsschema <span class="week-badge" id="weekBadge">Week A</span></h1>
+  <h1>Hoi Lisanne <span class="week-badge" id="weekBadge">Week A</span></h1>
   <div class="subtitle" id="topbarDate"></div>
 </div>
 
@@ -34,34 +34,14 @@
   <div id="agendaContent"></div>
 </div>
 
-<!-- ==================== HISTORY PAGE ==================== -->
-<div class="page" id="pageHistory">
-  <div class="card">
-    <div class="card-header"><span class="icon">&#128202;</span> Trainingsgeschiedenis</div>
-    <div id="historyList"></div>
-  </div>
-  <div class="card">
-    <div class="card-header"><span class="icon">&#128207;</span> Metingen</div>
-    <div id="measurementsList"></div>
-    <div class="checkin-form">
-      <div class="checkin-field">
-        <label>Gewicht (kg)</label>
-        <input type="number" step="0.1" id="inputWeight" placeholder="bv. 74.5">
-      </div>
-      <div class="checkin-field">
-        <label>Taille (cm) — optioneel</label>
-        <input type="number" step="0.5" id="inputWaist" placeholder="bv. 82">
-      </div>
-      <button class="save-btn" onclick="saveMeasurement()">Meting opslaan</button>
-    </div>
-  </div>
-</div>
+<!-- ==================== HISTORY / PROGRESS PAGE ==================== -->
+<div class="page" id="pageHistory"></div>
 
 <!-- ==================== TRAINING MODE (fullscreen overlay) ==================== -->
 <div class="training-mode" id="trainingMode">
   <div class="tm-header" id="tmHeader">
     <h2>Training</h2>
-    <button class="tm-close" onclick="exitTrainingMode(false)">Stoppen</button>
+    <button class="tm-close" onclick="confirmExitTraining()">Stoppen</button>
   </div>
   <div class="tm-progress"><div class="tm-progress-bar" id="tmProgressBar" style="width:0%"></div></div>
   <div class="tm-body" id="tmBody"></div>
@@ -104,8 +84,14 @@
   </button>
 </div>
 
-<!-- Scripts -->
+<!-- Firebase SDK (compat mode for broad browser support) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<!-- App Scripts -->
 <script src="data.js"></script>
+<script src="firebase-sync.js"></script>
 <script src="app.js"></script>
 <script>
 // Register Service Worker for PWA

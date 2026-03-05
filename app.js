@@ -7,6 +7,13 @@ function getStore(key, def) {
 }
 function setStore(key, val) {
   localStorage.setItem('lt_' + key, JSON.stringify(val));
+  // Cloud sync: stuur belangrijke data automatisch naar Firebase
+  if (typeof saveToCloud === 'function') {
+    var cloudKeys = ['sessions', 'measurements', 'onboardingDone', 'darkMode', 'startDate', 'weekType', 'calfPainHistory'];
+    if (cloudKeys.indexOf(key) !== -1) {
+      saveToCloud('lt_' + key, val);
+    }
+  }
 }
 
 // ================================================================
@@ -28,7 +35,80 @@ function getWeekNumber(d) {
 }
 
 function getWeekType() {
+  var weekBEnabled = getStore('weekBEnabled', false);
+  if (!weekBEnabled) return 'A';
   return getWeekNumber(new Date()) % 2 === 0 ? 'A' : 'B';
+}
+
+function isWeekBReady() {
+  // Check: kuitpijn < 2 gemiddeld over laatste 4 sessies met feedback
+  var sessions = getStore('sessions', []);
+  var withCalf = sessions.filter(function(s) { return s.feedback && s.feedback.calfPain !== null && s.feedback.calfPain !== undefined; });
+  if (withCalf.length < 4) return false;
+  var last4 = withCalf.slice(-4);
+  var avg = last4.reduce(function(t, s) { return t + s.feedback.calfPain; }, 0) / last4.length;
+  return avg < 2;
+}
+
+function toggleWeekB() {
+  var current = getStore('weekBEnabled', false);
+  setStore('weekBEnabled', !current);
+  renderToday();
+  renderHistory();
+}
+
+// ================================================================
+// PROGRESSIVE PHASES
+// ================================================================
+function getCurrentPhase() {
+  var override = getStore('phaseOverride', null);
+  if (override) return override;
+
+  var sessions = getStore('sessions', []);
+  if (sessions.length < 12) return 1;
+
+  // Check if at least 4 different weeks have sessions
+  var weeks = {};
+  sessions.forEach(function(s) {
+    var d = new Date(s.date);
+    var weekKey = d.getFullYear() + '-W' + getWeekNumber(d);
+    weeks[weekKey] = true;
+  });
+  if (Object.keys(weeks).length < 4) return 1;
+
+  return 2;
+}
+
+function isPhase2Available() {
+  var sessions = getStore('sessions', []);
+  var weeks = {};
+  sessions.forEach(function(s) {
+    var d = new Date(s.date);
+    var weekKey = d.getFullYear() + '-W' + getWeekNumber(d);
+    weeks[weekKey] = true;
+  });
+  return { sessions: sessions.length, weeks: Object.keys(weeks).length };
+}
+
+function getTrainingExercises(trainingKey) {
+  var phase = getCurrentPhase();
+  var config = PHASE_CONFIG[phase];
+  if (config && config[trainingKey]) {
+    return config[trainingKey];
+  }
+  // Fallback to default from TRAINING_DATA
+  var td = TRAINING_DATA[trainingKey];
+  return td ? td.exerciseIds : [];
+}
+
+function setPhaseOverride(phase) {
+  if (phase === null) {
+    localStorage.removeItem('lt_phaseOverride');
+  } else {
+    setStore('phaseOverride', phase);
+  }
+  renderToday();
+  renderHistory();
 }
 
 function getTodayKey() {
@@ -44,11 +124,135 @@ function daysSinceLastTraining() {
 }
 
 // ================================================================
+// SMART RECOVERY
+// ================================================================
+function getRecoveryStatus() {
+  var sessions = getStore('sessions', []);
+  var now = new Date();
+  var todayStr = getTodayKey();
+  var result = { warnings: [], suggestion: null };
+
+  // Bekijk de laatste 3 sessies
+  var recent = sessions.slice(-3).reverse();
+  if (recent.length === 0) return result;
+
+  var last = recent[0];
+  var lastDate = new Date(last.date);
+  var daysSince = Math.floor((now - lastDate) / 86400000);
+  var isYesterday = daysSince <= 1;
+  var isTwoDaysAgo = daysSince <= 2;
+
+  var lastIsKracht = last.type === 'kracht';
+  var lastIsBoven = last.name && last.name.toLowerCase().indexOf('boven') >= 0;
+  var lastIsOnder = last.name && last.name.toLowerCase().indexOf('onder') >= 0;
+
+  // Regel 1: Gisteren kracht → vandaag geen kracht
+  if (lastIsKracht && isYesterday) {
+    result.warnings.push('Gisteren was krachttraining \u2014 een rustdag of lichte cardio is beter voor herstel.');
+    result.suggestion = 'cardio';
+  }
+
+  // Regel 2: Bovenlichaam recent → niet opnieuw boven
+  if (lastIsBoven && isTwoDaysAgo) {
+    result.warnings.push('Laatste training was bovenlichaam (' + daysSince + (daysSince === 1 ? ' dag' : ' dagen') + ' geleden). Onderlichaam of cardio is slimmer.');
+    if (!result.suggestion) result.suggestion = 'krachtOnder';
+  }
+
+  // Regel 3: Onderlichaam recent → niet opnieuw onder
+  if (lastIsOnder && isTwoDaysAgo) {
+    result.warnings.push('Laatste training was onderlichaam (' + daysSince + (daysSince === 1 ? ' dag' : ' dagen') + ' geleden). Bovenlichaam of cardio is slimmer.');
+    if (!result.suggestion) result.suggestion = 'krachtBoven';
+  }
+
+  // Regel 4: 2+ cardio achter elkaar → suggereer kracht
+  if (recent.length >= 2 && recent[0].type === 'cardio' && recent[1].type === 'cardio') {
+    if (daysSince <= 2) {
+      result.suggestion = lastIsBoven ? 'krachtOnder' : 'krachtBoven';
+    }
+  }
+
+  // Regel 5: Lang niet getraind → welkom terug
+  if (daysSince >= 14) {
+    result.warnings = ['Welkom terug! Het is ' + daysSince + ' dagen geleden. Begin rustig en iets lichter.'];
+    result.suggestion = null;
+  }
+
+  return result;
+}
+
+function getRecoveryWarningForTraining(trainingKey) {
+  var recovery = getRecoveryStatus();
+  if (recovery.warnings.length === 0) return null;
+
+  var training = TRAINING_DATA[trainingKey];
+  if (!training || training.type !== 'kracht') return null;
+
+  var sessions = getStore('sessions', []);
+  var last = sessions.length > 0 ? sessions[sessions.length - 1] : null;
+  if (!last) return null;
+
+  var daysSince = Math.floor((new Date() - new Date(last.date)) / 86400000);
+  if (daysSince > 2) return null;
+
+  var lastIsKracht = last.type === 'kracht';
+  var lastIsBoven = last.name && last.name.toLowerCase().indexOf('boven') >= 0;
+  var lastIsOnder = last.name && last.name.toLowerCase().indexOf('onder') >= 0;
+  var todayIsBoven = trainingKey === 'krachtBoven';
+  var todayIsOnder = trainingKey === 'krachtOnder';
+
+  // Zelfde spiergroep?
+  if (todayIsBoven && lastIsBoven && daysSince <= 2) {
+    return '\u26A0 Laatste training was ook bovenlichaam. Overweeg onderlichaam of cardio voor beter herstel.';
+  }
+  if (todayIsOnder && lastIsOnder && daysSince <= 2) {
+    return '\u26A0 Laatste training was ook onderlichaam. Overweeg bovenlichaam of cardio voor beter herstel.';
+  }
+  // Kracht na kracht gisteren?
+  if (lastIsKracht && daysSince <= 1) {
+    return '\u26A0 Gisteren was krachttraining \u2014 een rustdag of lichte cardio is beter voor herstel.';
+  }
+
+  return null;
+}
+
+function getSmartRestDayTip(dayOfWeek, isCycling) {
+  var sessions = getStore('sessions', []);
+  if (sessions.length === 0) return null;
+  var last = sessions[sessions.length - 1];
+  var daysSince = Math.floor((new Date() - new Date(last.date)) / 86400000);
+
+  // Check recente kuitpijn
+  var recentCalf = sessions.filter(function(s) {
+    return s.feedback && s.feedback.calfPain !== null && s.feedback.calfPain !== undefined;
+  }).slice(-3);
+  var highCalfPain = recentCalf.length > 0 && recentCalf.some(function(s) { return s.feedback.calfPain >= 2; });
+
+  if (isCycling && highCalfPain) {
+    return '\uD83E\uDDB5 Je kuitpijn was recent hoog. Overweeg vandaag lichter te fietsen (lager verzet, hoger toerental) of de bus te pakken. Extra stretchen na het fietsen helpt ook.';
+  }
+
+  // Gisteren kracht + fietsdag vandaag
+  if (isCycling && daysSince <= 1 && last.type === 'kracht') {
+    var wasOnder = last.name && last.name.toLowerCase().indexOf('onder') >= 0;
+    if (wasOnder) {
+      return '\uD83D\uDCAA Gisteren was onderlichaam-training. Je benen kunnen stijf voelen op de fiets \u2014 dat is normaal. Fiets rustig en stretch goed na.';
+    }
+  }
+
+  // Lang niet getraind
+  if (daysSince >= 7 && daysSince < 999) {
+    return '\uD83D\uDC4B Het is ' + daysSince + ' dagen geleden. Zin om vandaag iets te doen? Tik op "Toch zin om te trainen" hieronder!';
+  }
+
+  return null;
+}
+
+// ================================================================
 // VIDEO HELPER
 // ================================================================
 function renderVideoHtml(ex) {
   if (!ex.videoUrl) return '';
-  return '<div class="exercise-video-container"><video class="exercise-video" src="' + ex.videoUrl + '" autoplay loop muted playsinline></video></div>';
+  return '<div class="exercise-video-container"><video class="exercise-video" src="' + ex.videoUrl + '" autoplay loop muted playsinline onerror="this.parentElement.style.display=\'none\'"></video></div>';
 }
 
 // ================================================================
@@ -120,32 +324,49 @@ document.addEventListener('visibilitychange', function() {
 });
 
 // ================================================================
-// TRAINING MODE STATE
+// TRAINING MODE STATE — STRAIGHT SETS
 // ================================================================
 var trainingModeActive = false;
 var currentTraining = null;
+var currentTrainingKey = '';
+var currentExerciseIds = [];
 var currentExerciseIndex = 0;
-var currentRound = 1;
-var totalRounds = 3;
+var currentSet = 1;
+var totalSets = 3;
 var tmTimerInterval = null;
 var tmTimerSeconds = 0;
 var tmState = 'idle'; // idle, set, resting
 var sessionExerciseLog = {};
+var trainingStartTime = null;
+var trainingPhase = 'warmup'; // warmup, exercises, cooldown
 
 function startTrainingMode(trainingKey) {
   currentTraining = TRAINING_DATA[trainingKey];
+  currentTrainingKey = trainingKey;
   if (!currentTraining || currentTraining.type !== 'kracht') return;
+
+  // Use phase-aware exercise list
+  currentExerciseIds = getTrainingExercises(trainingKey);
 
   trainingModeActive = true;
   currentExerciseIndex = 0;
-  currentRound = 1;
+  currentSet = 1;
   sessionExerciseLog = {};
+  trainingStartTime = new Date().toISOString();
   tmState = 'idle';
+  trainingPhase = 'warmup';
 
   requestWakeLock();
   document.getElementById('trainingMode').classList.add('active');
   document.getElementById('bottomNav').style.display = 'none';
   renderTrainingStep();
+}
+
+function confirmExitTraining() {
+  if (Object.keys(sessionExerciseLog).length > 0) {
+    if (!confirm('Weet je zeker dat je wilt stoppen? Je voortgang van deze sessie gaat verloren.')) return;
+  }
+  exitTrainingMode(false);
 }
 
 function exitTrainingMode(save) {
@@ -164,25 +385,33 @@ function exitTrainingMode(save) {
 }
 
 function getCurrentExercise() {
-  var ids = currentTraining.exerciseIds;
+  var ids = currentExerciseIds.length > 0 ? currentExerciseIds : currentTraining.exerciseIds;
   if (currentExerciseIndex >= ids.length) return null;
   return getExercise(ids[currentExerciseIndex]);
 }
 
 function renderTrainingStep() {
   var body = document.getElementById('tmBody');
+
+  // Warmup phase
+  if (trainingPhase === 'warmup') {
+    renderWarmupScreen();
+    return;
+  }
+
+  // Cooldown phase
+  if (trainingPhase === 'cooldown') {
+    renderCooldownScreen();
+    return;
+  }
+
+  // Exercise phase
   var ex = getCurrentExercise();
 
   if (!ex) {
-    // All exercises done for this round
-    if (currentRound < totalRounds) {
-      currentRound++;
-      currentExerciseIndex = 0;
-      renderTrainingStep();
-      return;
-    }
-    // All rounds done
-    exitTrainingMode(true);
+    // All exercises done → go to cooldown
+    trainingPhase = 'cooldown';
+    renderCooldownScreen();
     return;
   }
 
@@ -191,16 +420,19 @@ function renderTrainingStep() {
   var exId = ex.id;
   var prevWeight = getLastWeight(exId);
   var progression = getProgressionSuggestion(exId);
-  var logKey = exId + '_r' + currentRound;
+  var logKey = exId + '_s' + currentSet;
 
   if (tmState === 'resting') {
     renderRestScreen(ex);
     return;
   }
 
-  // Show exercise screen
+  // Show exercise screen — STRAIGHT SETS
+  var exNum = currentExerciseIndex + 1;
+  var ids = currentExerciseIds.length > 0 ? currentExerciseIds : currentTraining.exerciseIds;
+  var totalEx = ids.length;
   var html = '';
-  html += '<div class="tm-round-info">Ronde ' + currentRound + ' van ' + totalRounds + '</div>';
+  html += '<div class="tm-round-info">Oefening ' + exNum + '/' + totalEx + ' \u00b7 Set ' + currentSet + ' van ' + totalSets + '</div>';
   html += '<div class="tm-exercise-name">' + ex.name + '</div>';
   html += '<div class="tm-exercise-detail">' + ex.apparaat + ' \u00b7 ' + ex.reps + '</div>';
 
@@ -221,7 +453,18 @@ function renderTrainingStep() {
     html += '<input class="tm-input" type="number" id="tmReps" value="' + defaultReps + '"></div>';
     html += '</div>';
   } else {
-    html += '<div style="margin-bottom:16px;font-size:16px;color:var(--text-light)">Houd ' + ex.reps + ' vol</div>';
+    // Plank with countdown timer
+    var plankSec = 30; // default
+    var plankMatch = ex.reps.match(/(\d+)/);
+    if (plankMatch) plankSec = parseInt(plankMatch[plankMatch.length - 1]); // use upper bound
+
+    if (tmState === 'plank-timer') {
+      html += '<div class="tm-timer plank-active" id="tmTimerDisplay">' + formatTimer(tmTimerSeconds) + '</div>';
+      html += '<div style="font-size:14px;color:var(--text-light);margin-bottom:16px">Hou vol! Je kan dit!</div>';
+    } else {
+      html += '<div style="margin-bottom:16px;font-size:16px;color:var(--text-light)">Houd ' + ex.reps + ' vol</div>';
+      html += '<button class="tm-btn tm-btn-accent" onclick="startPlankTimer(' + plankSec + ')">Start plank timer (' + plankSec + ' sec)</button>';
+    }
   }
 
   // Instruction toggle
@@ -238,11 +481,129 @@ function renderTrainingStep() {
     html += '</div>';
   }
 
-  html += '<button class="tm-btn tm-btn-success" onclick="completeSet()">Set voltooid \u2714</button>';
+  if (!ex.isPlank || tmState !== 'plank-timer') {
+    html += '<button class="tm-btn tm-btn-success" onclick="completeSet()">Set voltooid \u2714</button>';
+  }
   html += '<button class="tm-btn tm-btn-outline tm-btn-small" onclick="skipExercise()">Overslaan</button>';
 
   body.innerHTML = html;
   document.getElementById('tmHeader').querySelector('h2').textContent = currentTraining.name;
+}
+
+function renderWarmupScreen() {
+  var body = document.getElementById('tmBody');
+  var warmup = currentTraining.warmup;
+  if (!warmup) {
+    trainingPhase = 'exercises';
+    renderTrainingStep();
+    return;
+  }
+
+  updateProgressBar();
+
+  // Parse warmup duration for timer (take lower bound, e.g. "5–8 min" → 5 min)
+  var warmupMin = 5;
+  if (warmup.duur) {
+    var match = warmup.duur.match(/(\d+)/);
+    if (match) warmupMin = parseInt(match[1]);
+  }
+
+  var html = '';
+  html += '<div class="tm-warmup-cooldown">';
+  html += '<div class="tm-phase-icon">\uD83D\uDD25</div>';
+  html += '<div class="tm-exercise-name">Warming-up</div>';
+  html += '<div class="tm-exercise-detail">' + warmup.apparaat + ' \u00b7 ' + warmup.duur + '</div>';
+  html += '<div style="color:var(--text-light);font-size:15px;margin:8px 0 20px">' + warmup.detail + '</div>';
+
+  if (tmState === 'warmup-timer') {
+    html += '<div class="tm-timer warmup" id="tmTimerDisplay">' + formatTimer(tmTimerSeconds) + '</div>';
+    html += '<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:16px">';
+    html += '<button class="tm-btn tm-btn-success" onclick="finishWarmup()">Klaar!</button>';
+    html += '<button class="tm-btn tm-btn-outline" style="max-width:150px" onclick="addRestTime(60)">+1 min</button>';
+    html += '</div>';
+  } else {
+    html += '<button class="tm-btn tm-btn-accent" onclick="startWarmupTimer(' + warmupMin + ')">Start warming-up timer (' + warmupMin + ' min)</button>';
+    html += '<button class="tm-btn tm-btn-outline tm-btn-small" onclick="finishWarmup()" style="margin-top:8px">Overslaan</button>';
+  }
+
+  html += '</div>';
+  body.innerHTML = html;
+  document.getElementById('tmHeader').querySelector('h2').textContent = 'Warming-up';
+}
+
+function startWarmupTimer(minutes) {
+  tmState = 'warmup-timer';
+  tmTimerSeconds = minutes * 60;
+  renderWarmupScreen();
+  clearInterval(tmTimerInterval);
+  tmTimerInterval = setInterval(function() {
+    tmTimerSeconds--;
+    var display = document.getElementById('tmTimerDisplay');
+    if (display) display.textContent = formatTimer(tmTimerSeconds);
+    if (tmTimerSeconds <= 0) {
+      clearInterval(tmTimerInterval);
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+      finishWarmup();
+    }
+  }, 1000);
+}
+
+function finishWarmup() {
+  clearInterval(tmTimerInterval);
+  tmState = 'idle';
+  trainingPhase = 'exercises';
+  renderTrainingStep();
+}
+
+function renderCooldownScreen() {
+  var body = document.getElementById('tmBody');
+  var cooldown = currentTraining.cooldown;
+
+  updateProgressBar();
+
+  var html = '';
+  html += '<div class="tm-warmup-cooldown">';
+  html += '<div class="tm-phase-icon">\uD83E\uDDD8</div>';
+  html += '<div class="tm-exercise-name">Cooldown</div>';
+  html += '<div style="color:var(--text-light);font-size:15px;margin:8px 0 4px;line-height:1.5">' + (cooldown || '5 min rustig stretchen') + '</div>';
+
+  if (tmState === 'cooldown-timer') {
+    html += '<div class="tm-timer cooldown" id="tmTimerDisplay">' + formatTimer(tmTimerSeconds) + '</div>';
+    html += '<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:16px">';
+    html += '<button class="tm-btn tm-btn-success" onclick="finishCooldown()">Klaar!</button>';
+    html += '<button class="tm-btn tm-btn-outline" style="max-width:150px" onclick="addRestTime(60)">+1 min</button>';
+    html += '</div>';
+  } else {
+    html += '<button class="tm-btn tm-btn-accent" onclick="startCooldownTimer()" style="margin-top:16px">Start cooldown timer (5 min)</button>';
+    html += '<button class="tm-btn tm-btn-outline tm-btn-small" onclick="finishCooldown()" style="margin-top:8px">Overslaan</button>';
+  }
+
+  html += '</div>';
+  body.innerHTML = html;
+  document.getElementById('tmHeader').querySelector('h2').textContent = 'Cooldown';
+}
+
+function startCooldownTimer() {
+  tmState = 'cooldown-timer';
+  tmTimerSeconds = 5 * 60;
+  renderCooldownScreen();
+  clearInterval(tmTimerInterval);
+  tmTimerInterval = setInterval(function() {
+    tmTimerSeconds--;
+    var display = document.getElementById('tmTimerDisplay');
+    if (display) display.textContent = formatTimer(tmTimerSeconds);
+    if (tmTimerSeconds <= 0) {
+      clearInterval(tmTimerInterval);
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+      finishCooldown();
+    }
+  }, 1000);
+}
+
+function finishCooldown() {
+  clearInterval(tmTimerInterval);
+  tmState = 'idle';
+  exitTrainingMode(true);
 }
 
 function toggleTmInstruction() {
@@ -250,11 +611,29 @@ function toggleTmInstruction() {
   if (box) box.classList.toggle('show');
 }
 
+function startPlankTimer(seconds) {
+  tmState = 'plank-timer';
+  tmTimerSeconds = seconds;
+  renderTrainingStep();
+  clearInterval(tmTimerInterval);
+  tmTimerInterval = setInterval(function() {
+    tmTimerSeconds--;
+    var display = document.getElementById('tmTimerDisplay');
+    if (display) display.textContent = formatTimer(tmTimerSeconds);
+    if (tmTimerSeconds <= 0) {
+      clearInterval(tmTimerInterval);
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+      tmState = 'idle';
+      completeSet();
+    }
+  }, 1000);
+}
+
 function completeSet() {
   var ex = getCurrentExercise();
   if (!ex) return;
 
-  var logKey = ex.id + '_r' + currentRound;
+  var logKey = ex.id + '_s' + currentSet;
 
   if (!ex.isPlank) {
     var w = parseFloat(document.getElementById('tmWeight').value) || 0;
@@ -264,7 +643,7 @@ function completeSet() {
     sessionExerciseLog[logKey] = { id: ex.id, weight: 0, reps: 0, done: true };
   }
 
-  // Start rest timer
+  // Start rest timer (shorter rest after last set before next exercise)
   tmState = 'resting';
   tmTimerSeconds = ex.rest;
   renderRestScreen(ex);
@@ -293,20 +672,21 @@ function renderRestScreen(ex) {
 }
 
 function getNextExercisePreview() {
-  var ids = currentTraining.exerciseIds;
-  var nextIdx = currentExerciseIndex + 1;
-  var nextRound = currentRound;
+  var ids = currentExerciseIds.length > 0 ? currentExerciseIds : currentTraining.exerciseIds;
 
-  if (nextIdx >= ids.length) {
-    nextIdx = 0;
-    nextRound = currentRound + 1;
+  // Nog sets te doen van huidige oefening?
+  if (currentSet < totalSets) {
+    var curEx = getCurrentExercise();
+    return curEx ? curEx.name + ' (set ' + (currentSet + 1) + ')' : null;
   }
 
-  if (nextRound > totalRounds) return null;
+  // Volgende oefening?
+  var nextIdx = currentExerciseIndex + 1;
+  if (nextIdx >= ids.length) return null; // klaar
 
   var nextEx = getExercise(ids[nextIdx]);
   if (!nextEx) return null;
-  return nextEx.name + ' (ronde ' + nextRound + ')';
+  return nextEx.name + ' (set 1)';
 }
 
 function startRestTimer() {
@@ -327,17 +707,14 @@ function startRestTimer() {
 function skipRest() {
   clearInterval(tmTimerInterval);
   tmState = 'idle';
-  currentExerciseIndex++;
 
-  var ids = currentTraining.exerciseIds;
-  if (currentExerciseIndex >= ids.length) {
-    if (currentRound < totalRounds) {
-      currentRound++;
-      currentExerciseIndex = 0;
-    } else {
-      exitTrainingMode(true);
-      return;
-    }
+  // STRAIGHT SETS: volgende set van zelfde oefening
+  if (currentSet < totalSets) {
+    currentSet++;
+  } else {
+    // Alle sets klaar → volgende oefening
+    currentExerciseIndex++;
+    currentSet = 1;
   }
 
   renderTrainingStep();
@@ -350,25 +727,23 @@ function addRestTime(secs) {
 }
 
 function skipExercise() {
+  // Skip hele oefening (alle resterende sets)
   tmState = 'idle';
   currentExerciseIndex++;
-  var ids = currentTraining.exerciseIds;
-  if (currentExerciseIndex >= ids.length) {
-    if (currentRound < totalRounds) {
-      currentRound++;
-      currentExerciseIndex = 0;
-    } else {
-      exitTrainingMode(true);
-      return;
-    }
-  }
+  currentSet = 1;
   renderTrainingStep();
 }
 
 function updateProgressBar() {
-  var totalExercises = currentTraining.exerciseIds.length * totalRounds;
-  var done = ((currentRound - 1) * currentTraining.exerciseIds.length) + currentExerciseIndex;
-  var pct = Math.round((done / totalExercises) * 100);
+  // Total = warmup(1) + exercises*sets + cooldown(1)
+  var ids = currentExerciseIds.length > 0 ? currentExerciseIds : currentTraining.exerciseIds;
+  var exWork = ids.length * totalSets;
+  var total = 1 + exWork + 1;
+  var done = 0;
+  if (trainingPhase === 'warmup') done = 0;
+  else if (trainingPhase === 'exercises') done = 1 + (currentExerciseIndex * totalSets) + (currentSet - 1);
+  else if (trainingPhase === 'cooldown') done = 1 + exWork;
+  var pct = Math.round((done / total) * 100);
   var bar = document.getElementById('tmProgressBar');
   if (bar) bar.style.width = pct + '%';
 }
@@ -394,15 +769,16 @@ function renderCompletionInTrainingMode() {
   // Calculate stats
   var exerciseCount = 0;
   var maxWeight = 0;
-  var totalSets = 0;
+  var completedSets = 0;
   Object.keys(sessionExerciseLog).forEach(function(key) {
     var entry = sessionExerciseLog[key];
     if (entry.done) {
-      totalSets++;
+      completedSets++;
       if (entry.weight > maxWeight) maxWeight = entry.weight;
     }
   });
-  exerciseCount = currentTraining.exerciseIds.length;
+  var activeIds = currentExerciseIds.length > 0 ? currentExerciseIds : currentTraining.exerciseIds;
+  exerciseCount = activeIds.length;
 
   var html = '<div class="completion-screen">';
   html += '<div class="emoji">\uD83C\uDF89</div>';
@@ -411,56 +787,180 @@ function renderCompletionInTrainingMode() {
   html += '<div class="completion-stats">';
   html += '<div class="completion-stat"><span class="completion-stat-label">Training</span><span class="completion-stat-value">' + currentTraining.name + '</span></div>';
   html += '<div class="completion-stat"><span class="completion-stat-label">Oefeningen</span><span class="completion-stat-value">' + exerciseCount + '</span></div>';
-  html += '<div class="completion-stat"><span class="completion-stat-label">Sets voltooid</span><span class="completion-stat-value">' + totalSets + '</span></div>';
+  html += '<div class="completion-stat"><span class="completion-stat-label">Sets voltooid</span><span class="completion-stat-value">' + completedSets + '</span></div>';
   if (maxWeight > 0) {
     html += '<div class="completion-stat"><span class="completion-stat-label">Zwaarste gewicht</span><span class="completion-stat-value">' + maxWeight + ' kg</span></div>';
   }
   html += '<div class="completion-stat"><span class="completion-stat-label">Datum</span><span class="completion-stat-value">' + formatDateNL(new Date()) + '</span></div>';
   html += '</div>';
-  html += '<button class="tm-btn tm-btn-primary" style="margin-top:24px" onclick="closeCompletionScreen()">Sluiten</button>';
+  // Feedback section
+  html += renderFeedbackForm();
+  html += '<button class="tm-btn tm-btn-primary" style="margin-top:16px" onclick="saveFeedbackAndClose()">Opslaan &amp; sluiten</button>';
+  html += '<button class="tm-btn tm-btn-outline" style="margin-top:8px" onclick="closeCompletionScreen()">Overslaan</button>';
+
+  // Loopband optie na krachttraining
+  html += '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);text-align:center">';
+  html += '<div style="font-size:13px;color:var(--text-light);margin-bottom:8px">\uD83D\uDEB6\u200D\u2640\uFE0F Nog zin om te wandelen?</div>';
+  html += '<button class="tm-btn tm-btn-outline tm-btn-small" onclick="saveFeedbackAndStartWandelen()">Start loopband wandelen (35 min)</button>';
+  html += '</div>';
   html += '</div>';
 
   body.innerHTML = html;
 }
 
+function renderFeedbackForm() {
+  var html = '<div class="feedback-section" style="margin-top:20px;padding:16px;background:var(--bg);border-radius:12px">';
+  html += '<div style="font-weight:600;font-size:15px;margin-bottom:12px">Hoe voelde het?</div>';
+
+  // Energy/feeling rating (1-5 emoji)
+  html += '<div style="margin-bottom:16px">';
+  html += '<div style="font-size:14px;color:var(--text-light);margin-bottom:8px">Energie / gevoel</div>';
+  html += '<div class="feedback-stars" id="feedbackEnergy" style="display:flex;gap:8px">';
+  var energyEmojis = ['\uD83D\uDE29', '\uD83D\uDE14', '\uD83D\uDE10', '\uD83D\uDE0A', '\uD83D\uDCAA'];
+  var energyLabels = ['Uitgeput', 'Moe', 'Oké', 'Goed', 'Super!'];
+  for (var i = 0; i < 5; i++) {
+    html += '<button class="feedback-emoji-btn" data-value="' + (i + 1) + '" onclick="selectFeedback(\'feedbackEnergy\',' + (i + 1) + ',this)" ';
+    html += 'style="flex:1;min-height:56px;padding:10px 2px;border:2px solid var(--border);border-radius:12px;background:var(--card);font-size:24px;cursor:pointer;text-align:center">';
+    html += energyEmojis[i] + '<div style="font-size:10px;margin-top:4px">' + energyLabels[i] + '</div></button>';
+  }
+  html += '</div></div>';
+
+  // Calf pain score (0-3)
+  html += '<div style="margin-bottom:16px">';
+  html += '<div style="font-size:14px;color:var(--text-light);margin-bottom:8px">Kuitpijn vandaag?</div>';
+  html += '<div class="feedback-stars" id="feedbackCalf" style="display:flex;gap:8px">';
+  var calfLabels = ['Nee', 'Beetje', 'Best wel', 'Veel'];
+  var calfColors = ['var(--success)', '#F39C12', '#E67E22', '#E74C3C'];
+  for (var c = 0; c < 4; c++) {
+    html += '<button class="feedback-calf-btn" data-value="' + c + '" onclick="selectFeedback(\'feedbackCalf\',' + c + ',this)" ';
+    html += 'style="flex:1;min-height:48px;padding:12px 4px;border:2px solid var(--border);border-radius:12px;background:var(--card);font-size:13px;font-weight:600;cursor:pointer;text-align:center">';
+    html += calfLabels[c] + '</button>';
+  }
+  html += '</div></div>';
+
+  // Optional note
+  html += '<div>';
+  html += '<div style="font-size:13px;color:var(--text-light);margin-bottom:6px">Notitie (optioneel)</div>';
+  html += '<textarea id="feedbackNote" placeholder="bv. schouder voelde stijf, of: lekker getraind!" ';
+  html += 'style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:13px;resize:none;height:60px;font-family:inherit"></textarea>';
+  html += '</div>';
+
+  html += '</div>';
+  return html;
+}
+
+var selectedFeedback = { energy: null, calf: null };
+
+function selectFeedback(groupId, value, btn) {
+  var group = document.getElementById(groupId);
+  if (!group) return;
+  var buttons = group.querySelectorAll('button');
+  buttons.forEach(function(b) {
+    b.style.borderColor = 'var(--border)';
+    b.style.background = 'var(--card)';
+  });
+  btn.style.borderColor = 'var(--primary)';
+  btn.style.background = 'rgba(27,79,114,0.1)';
+  if (groupId === 'feedbackEnergy') selectedFeedback.energy = value;
+  if (groupId === 'feedbackCalf') selectedFeedback.calf = value;
+}
+
+function saveFeedbackAndClose() {
+  var note = document.getElementById('feedbackNote') ? document.getElementById('feedbackNote').value.trim() : '';
+  var todayKey = getTodayKey();
+  var sessions = getStore('sessions', []);
+  for (var i = sessions.length - 1; i >= 0; i--) {
+    if (sessions[i].date === todayKey) {
+      sessions[i].feedback = {
+        energy: selectedFeedback.energy,
+        calfPain: selectedFeedback.calf,
+        note: note || null
+      };
+      break;
+    }
+  }
+  setStore('sessions', sessions);
+  selectedFeedback = { energy: null, calf: null };
+  closeCompletionScreen();
+}
+
 function closeCompletionScreen() {
+  selectedFeedback = { energy: null, calf: null };
   document.getElementById('trainingMode').classList.remove('active');
   document.getElementById('bottomNav').style.display = 'flex';
   renderToday();
 }
 
+function saveFeedbackAndStartWandelen() {
+  // Save feedback first (reuse same logic)
+  var note = document.getElementById('feedbackNote') ? document.getElementById('feedbackNote').value.trim() : '';
+  var todayKey = getTodayKey();
+  var sessions = getStore('sessions', []);
+  for (var i = sessions.length - 1; i >= 0; i--) {
+    if (sessions[i].date === todayKey) {
+      sessions[i].feedback = {
+        energy: selectedFeedback.energy,
+        calfPain: selectedFeedback.calf,
+        note: note || null
+      };
+      break;
+    }
+  }
+  setStore('sessions', sessions);
+  selectedFeedback = { energy: null, calf: null };
+
+  // Close kracht completion and start loopband
+  document.getElementById('trainingMode').classList.remove('active');
+  startLoopbandWandelen();
+}
+
 function saveFinalSession() {
   var todayKey = getTodayKey();
   var sessions = getStore('sessions', []);
-  if (sessions.find(function(s) { return s.date === todayKey; })) return;
+  // Update existing session for today or create new one
+  var existingIdx = -1;
+  sessions.forEach(function(s, i) { if (s.date === todayKey) existingIdx = i; });
 
   var exerciseMap = {};
   Object.keys(sessionExerciseLog).forEach(function(key) {
     var val = sessionExerciseLog[key];
     if (!val.done) return;
     var baseId = val.id;
-    if (!exerciseMap[baseId]) exerciseMap[baseId] = { id: baseId, weights: [], reps: [] };
-    if (val.weight > 0) exerciseMap[baseId].weights.push(val.weight);
-    if (val.reps > 0) exerciseMap[baseId].reps.push(val.reps);
+    if (!exerciseMap[baseId]) exerciseMap[baseId] = { id: baseId, sets: [] };
+    exerciseMap[baseId].sets.push({ weight: val.weight || 0, reps: val.reps || 0 });
   });
 
   var exerciseLog = [];
   Object.keys(exerciseMap).forEach(function(key) {
     var ex = exerciseMap[key];
+    var weights = ex.sets.map(function(s) { return s.weight; }).filter(function(w) { return w > 0; });
+    var reps = ex.sets.map(function(s) { return s.reps; }).filter(function(r) { return r > 0; });
     exerciseLog.push({
       id: ex.id,
-      weight: ex.weights.length > 0 ? Math.max.apply(null, ex.weights) : 0,
-      reps: ex.reps.length > 0 ? Math.max.apply(null, ex.reps) : 0,
+      weight: weights.length > 0 ? Math.max.apply(null, weights) : 0,
+      reps: reps.length > 0 ? Math.max.apply(null, reps) : 0,
+      sets: ex.sets
     });
   });
 
-  sessions.push({
+  var sessionData = {
     date: todayKey,
     type: 'kracht',
     name: currentTraining.name,
+    trainingKey: currentTrainingKey || '',
     exercises: exerciseLog,
-  });
+    startedAt: trainingStartTime || null,
+    completedAt: new Date().toISOString(),
+    feedback: null  // filled in by feedback screen
+  };
+
+  if (existingIdx >= 0) {
+    sessions[existingIdx] = sessionData;
+  } else {
+    sessions.push(sessionData);
+  }
   setStore('sessions', sessions);
+  return sessionData;
 }
 
 // ================================================================
@@ -471,9 +971,16 @@ var cardioPhases = [];
 var cardioPhaseIndex = 0;
 var cardioPhaseSeconds = 0;
 var cardioTimerInterval = null;
-var cardioIntervalMode = 'normal'; // normal, fast
+var cardioIntervalMode = 'slow'; // slow, fast
 var cardioIntervalConfig = null;
 var cardioTrainingName = '';
+var intervalSecondsLeft = 0; // seconds left in current interval segment
+var intervalTotalCycles = 0; // how many fast+slow cycles completed
+var intervalIsAutoMode = false; // true when in an auto-interval phase
+
+function startLoopbandWandelen() {
+  startCardioTimer('loopbandWandelen', 0);
+}
 
 function startCardioTimer(trainingKey, optionIndex) {
   var training = TRAINING_DATA[trainingKey];
@@ -482,15 +989,33 @@ function startCardioTimer(trainingKey, optionIndex) {
   cardioIntervalConfig = opt.interval || null;
   cardioPhaseIndex = 0;
   cardioPhaseSeconds = opt.phases[0].duur * 60;
-  cardioIntervalMode = 'normal';
+  cardioIntervalMode = 'slow';
+  intervalSecondsLeft = 0;
+  intervalTotalCycles = 0;
+  intervalIsAutoMode = false;
   cardioTimerActive = true;
   cardioTrainingName = training.name + ' \u2014 ' + opt.name;
 
   requestWakeLock();
   document.getElementById('trainingMode').classList.add('active');
   document.getElementById('bottomNav').style.display = 'none';
+  initIntervalForPhase();
   renderCardioTimerStep();
   startCardioCountdown();
+}
+
+function initIntervalForPhase() {
+  // Check if this phase is an auto-interval phase (has interval config + intensity 'high')
+  var phase = cardioPhases[cardioPhaseIndex];
+  if (cardioIntervalConfig && cardioIntervalConfig.fast && phase && phase.intensity === 'high') {
+    intervalIsAutoMode = true;
+    cardioIntervalMode = 'slow';
+    intervalSecondsLeft = cardioIntervalConfig.slow;
+    intervalTotalCycles = 0;
+  } else {
+    intervalIsAutoMode = false;
+    intervalSecondsLeft = 0;
+  }
 }
 
 function renderCardioTimerStep() {
@@ -503,18 +1028,40 @@ function renderCardioTimerStep() {
 
   var html = '';
   html += '<div class="ct-phase-display">' + phase.name + '</div>';
-  html += '<div class="ct-detail">' + phase.detail + '</div>';
 
-  // Interval badge
-  if (cardioIntervalConfig && phase.intensity === 'medium') {
-    if (cardioIntervalMode === 'fast') {
-      html += '<div class="ct-interval-badge ct-interval-fast">Sneller tempo!</div>';
-    } else {
-      html += '<div class="ct-interval-badge ct-interval-normal">Normaal tempo</div>';
+  // Auto-interval mode: show interval UI
+  if (intervalIsAutoMode) {
+    var isFast = cardioIntervalMode === 'fast';
+    var speedLabel = isFast ? cardioIntervalConfig.fastDetail : cardioIntervalConfig.slowDetail;
+    var modeLabel = isFast ? 'STEVIG' : 'RUSTIG';
+
+    html += '<div class="ct-detail">' + speedLabel + '</div>';
+
+    // Big interval mode badge
+    html += '<div class="ct-interval-badge ' + (isFast ? 'ct-interval-fast' : 'ct-interval-normal') + '" style="font-size:18px;padding:10px 24px">';
+    html += modeLabel + '</div>';
+
+    // Interval segment countdown
+    html += '<div style="font-size:48px;font-weight:700;color:' + (isFast ? 'var(--danger)' : 'var(--primary)') + ';margin:8px 0" id="intervalTimerDisplay">' + formatTimer(intervalSecondsLeft) + '</div>';
+    html += '<div style="font-size:12px;color:var(--text-light);margin-bottom:8px">Wissel over ' + formatTimer(intervalSecondsLeft) + ' naar ' + (isFast ? 'rustig' : 'stevig') + '</div>';
+
+    // Total phase timer (smaller)
+    html += '<div style="font-size:14px;color:var(--text-light);margin-bottom:4px">Totaal fase: <span id="cardioTimerDisplay" style="font-weight:600">' + formatTimer(cardioPhaseSeconds) + '</span></div>';
+    html += '<div style="font-size:12px;color:var(--text-light)">Ronde ' + (intervalTotalCycles + 1) + '</div>';
+
+  } else {
+    // Normal phase display
+    html += '<div class="ct-detail">' + phase.detail + '</div>';
+
+    // Manual interval badge for medium-intensity phases with old-style interval config
+    if (cardioIntervalConfig && cardioIntervalConfig.normalMin && phase.intensity === 'medium') {
+      html += '<div style="font-size:12px;color:var(--text-light);margin-bottom:8px;padding:6px 12px;background:var(--bg);border-radius:8px">';
+      html += '\uD83D\uDCA1 ' + cardioIntervalConfig.label;
+      html += '</div>';
     }
-  }
 
-  html += '<div class="tm-timer" id="cardioTimerDisplay">' + formatTimer(cardioPhaseSeconds) + '</div>';
+    html += '<div class="tm-timer" id="cardioTimerDisplay">' + formatTimer(cardioPhaseSeconds) + '</div>';
+  }
 
   // Next phase preview
   if (cardioPhaseIndex < cardioPhases.length - 1) {
@@ -524,11 +1071,6 @@ function renderCardioTimerStep() {
   html += '<div style="margin-top:24px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">';
   if (cardioPhaseIndex < cardioPhases.length - 1) {
     html += '<button class="tm-btn tm-btn-accent" style="max-width:180px" onclick="skipCardioPhase()">Volgende fase</button>';
-  }
-  if (cardioIntervalConfig && phase.intensity === 'medium') {
-    html += '<button class="tm-btn tm-btn-outline" style="max-width:180px" onclick="toggleCardioInterval()">';
-    html += cardioIntervalMode === 'normal' ? 'Start interval' : 'Terug normaal';
-    html += '</button>';
   }
   html += '</div>';
   html += '<button class="tm-btn tm-btn-outline tm-btn-small" style="margin-top:12px" onclick="stopCardioTimer()">Training stoppen</button>';
@@ -540,9 +1082,41 @@ function startCardioCountdown() {
   clearInterval(cardioTimerInterval);
   cardioTimerInterval = setInterval(function() {
     cardioPhaseSeconds--;
-    var display = document.getElementById('cardioTimerDisplay');
-    if (display) display.textContent = formatTimer(cardioPhaseSeconds);
 
+    // Auto-interval mode: also tick the interval segment
+    if (intervalIsAutoMode) {
+      intervalSecondsLeft--;
+
+      // Update interval display
+      var intervalDisplay = document.getElementById('intervalTimerDisplay');
+      if (intervalDisplay) intervalDisplay.textContent = formatTimer(intervalSecondsLeft);
+
+      // Phase timer (smaller display)
+      var phaseDisplay = document.getElementById('cardioTimerDisplay');
+      if (phaseDisplay) phaseDisplay.textContent = formatTimer(cardioPhaseSeconds);
+
+      // Interval segment ended — switch mode
+      if (intervalSecondsLeft <= 0 && cardioPhaseSeconds > 0) {
+        if (cardioIntervalMode === 'fast') {
+          cardioIntervalMode = 'slow';
+          intervalSecondsLeft = Math.min(cardioIntervalConfig.slow, cardioPhaseSeconds);
+          intervalTotalCycles++;
+        } else {
+          cardioIntervalMode = 'fast';
+          intervalSecondsLeft = Math.min(cardioIntervalConfig.fast, cardioPhaseSeconds);
+        }
+        // Vibrate on switch
+        if (navigator.vibrate) navigator.vibrate(cardioIntervalMode === 'fast' ? [300, 100, 300] : [150]);
+        renderCardioTimerStep();
+        return;
+      }
+    } else {
+      // Normal mode: just update phase timer
+      var display = document.getElementById('cardioTimerDisplay');
+      if (display) display.textContent = formatTimer(cardioPhaseSeconds);
+    }
+
+    // Phase ended
     if (cardioPhaseSeconds <= 0) {
       if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
       advanceCardioPhase();
@@ -557,7 +1131,8 @@ function advanceCardioPhase() {
     return;
   }
   cardioPhaseSeconds = cardioPhases[cardioPhaseIndex].duur * 60;
-  cardioIntervalMode = 'normal';
+  cardioIntervalMode = 'slow';
+  initIntervalForPhase();
   renderCardioTimerStep();
 }
 
@@ -565,10 +1140,7 @@ function skipCardioPhase() {
   advanceCardioPhase();
 }
 
-function toggleCardioInterval() {
-  cardioIntervalMode = cardioIntervalMode === 'normal' ? 'fast' : 'normal';
-  renderCardioTimerStep();
-}
+// toggleCardioInterval removed — intervals now auto-switch
 
 function updateCardioProgressBar() {
   var totalSecs = cardioPhases.reduce(function(t, p) { return t + p.duur * 60; }, 0);
@@ -589,14 +1161,29 @@ function completeCardioSession() {
   // Save session
   var todayKey = getTodayKey();
   var sessions = getStore('sessions', []);
-  if (!sessions.find(function(s) { return s.date === todayKey; })) {
-    sessions.push({ date: todayKey, type: 'cardio', name: cardioTrainingName });
-    setStore('sessions', sessions);
+  var existingIdx = -1;
+  sessions.forEach(function(s, i) { if (s.date === todayKey) existingIdx = i; });
+
+  var totalMin = cardioPhases.reduce(function(t, p) { return t + p.duur; }, 0);
+  var sessionData = {
+    date: todayKey,
+    type: 'cardio',
+    name: cardioTrainingName,
+    duration: totalMin,
+    completedAt: new Date().toISOString(),
+    feedback: null  // filled in by feedback screen
+  };
+
+  if (existingIdx >= 0) {
+    sessions[existingIdx] = sessionData;
+  } else {
+    sessions.push(sessionData);
   }
+  setStore('sessions', sessions);
 
   // Show completion
+  selectedFeedback = { energy: null, calf: null };
   var body = document.getElementById('tmBody');
-  var totalMin = cardioPhases.reduce(function(t, p) { return t + p.duur; }, 0);
 
   var html = '<div class="completion-screen">';
   html += '<div class="emoji">\uD83C\uDF89</div>';
@@ -607,7 +1194,9 @@ function completeCardioSession() {
   html += '<div class="completion-stat"><span class="completion-stat-label">Totale duur</span><span class="completion-stat-value">' + totalMin + ' min</span></div>';
   html += '<div class="completion-stat"><span class="completion-stat-label">Datum</span><span class="completion-stat-value">' + formatDateNL(new Date()) + '</span></div>';
   html += '</div>';
-  html += '<button class="tm-btn tm-btn-primary" style="margin-top:24px" onclick="closeCompletionScreen()">Sluiten</button>';
+  html += renderFeedbackForm();
+  html += '<button class="tm-btn tm-btn-primary" style="margin-top:16px" onclick="saveFeedbackAndClose()">Opslaan &amp; sluiten</button>';
+  html += '<button class="tm-btn tm-btn-outline" style="margin-top:8px" onclick="closeCompletionScreen()">Overslaan</button>';
   html += '</div>';
 
   body.innerHTML = html;
@@ -626,6 +1215,203 @@ function stopCardioTimer() {
 // ================================================================
 // TODAY PAGE RENDERING
 // ================================================================
+function renderWeekSummary() {
+  var now = new Date();
+  // Only show on Monday (day 1)
+  if (now.getDay() !== 1) return '';
+
+  var sessions = getStore('sessions', []);
+  if (sessions.length === 0) return '';
+
+  // Get last week's Monday
+  var lastMonday = new Date(now);
+  lastMonday.setDate(lastMonday.getDate() - 7);
+  lastMonday.setHours(0, 0, 0, 0);
+  var lastSunday = new Date(lastMonday);
+  lastSunday.setDate(lastSunday.getDate() + 7);
+  lastSunday.setHours(0, 0, 0, 0);
+
+  var weekSessions = sessions.filter(function(s) {
+    var d = new Date(s.date);
+    return d >= lastMonday && d < lastSunday;
+  });
+
+  if (weekSessions.length === 0) return '';
+
+  // Gather stats
+  var kracht = weekSessions.filter(function(s) { return s.type === 'kracht'; }).length;
+  var cardio = weekSessions.filter(function(s) { return s.type === 'cardio'; }).length;
+  var avgEnergy = 0;
+  var energyCount = 0;
+  var calfSum = 0;
+  var calfCount = 0;
+  weekSessions.forEach(function(s) {
+    if (s.feedback && s.feedback.energy) { avgEnergy += s.feedback.energy; energyCount++; }
+    if (s.feedback && s.feedback.calfPain !== null && s.feedback.calfPain !== undefined) { calfSum += s.feedback.calfPain; calfCount++; }
+  });
+  if (energyCount > 0) avgEnergy = avgEnergy / energyCount;
+  var avgCalf = calfCount > 0 ? (calfSum / calfCount) : -1;
+
+  var energyEmojis = ['', '\uD83D\uDE29', '\uD83D\uDE14', '\uD83D\uDE10', '\uD83D\uDE0A', '\uD83D\uDCAA'];
+  var energyEmoji = energyEmojis[Math.round(avgEnergy)] || '';
+
+  var html = '<div class="card" style="margin:12px 16px">';
+  html += '<div class="card-header"><span class="icon">\uD83D\uDCCA</span> Vorige week</div>';
+  html += '<div style="padding:14px 16px">';
+
+  // Stats row
+  html += '<div style="display:flex;gap:12px;margin-bottom:12px;text-align:center">';
+  html += '<div style="flex:1;background:var(--bg);border-radius:10px;padding:10px">';
+  html += '<div style="font-size:22px;font-weight:700;color:var(--primary)">' + weekSessions.length + '</div>';
+  html += '<div style="font-size:11px;color:var(--text-light)">trainingen</div></div>';
+  if (kracht > 0) {
+    html += '<div style="flex:1;background:var(--bg);border-radius:10px;padding:10px">';
+    html += '<div style="font-size:22px;font-weight:700;color:var(--primary)">' + kracht + '</div>';
+    html += '<div style="font-size:11px;color:var(--text-light)">kracht</div></div>';
+  }
+  if (cardio > 0) {
+    html += '<div style="flex:1;background:var(--bg);border-radius:10px;padding:10px">';
+    html += '<div style="font-size:22px;font-weight:700;color:var(--accent)">' + cardio + '</div>';
+    html += '<div style="font-size:11px;color:var(--text-light)">cardio</div></div>';
+  }
+  if (energyCount > 0) {
+    html += '<div style="flex:1;background:var(--bg);border-radius:10px;padding:10px">';
+    html += '<div style="font-size:22px">' + energyEmoji + '</div>';
+    html += '<div style="font-size:11px;color:var(--text-light)">energie</div></div>';
+  }
+  html += '</div>';
+
+  // Smart message
+  if (weekSessions.length >= 3) {
+    html += '<div style="font-size:13px;color:var(--success);line-height:1.5">\uD83C\uDF1F Sterke week! ' + weekSessions.length + ' trainingen gedaan.</div>';
+  } else if (weekSessions.length >= 1) {
+    html += '<div style="font-size:13px;color:var(--text-light);line-height:1.5">Goed bezig vorige week! Elke training telt.</div>';
+  }
+  if (avgCalf >= 2) {
+    html += '<div style="font-size:12px;color:var(--accent);margin-top:4px">\uD83E\uDDB5 Kuitpijn was gemiddeld ' + avgCalf.toFixed(1) + '/3 \u2014 neem het vandaag rustig aan.</div>';
+  } else if (avgCalf >= 0 && avgCalf < 1) {
+    html += '<div style="font-size:12px;color:var(--success);margin-top:4px">\uD83E\uDDB5 Kuiten voelden goed vorige week!</div>';
+  }
+
+  html += '</div></div>';
+  return html;
+}
+
+function renderMotivationStrip() {
+  var sessions = getStore('sessions', []);
+  if (sessions.length === 0) return '';
+
+  var streak = calcStreak(sessions);
+  var thisWeek = countThisWeek(sessions);
+  var total = sessions.length;
+  var phase = getCurrentPhase();
+
+  // Pick a motivational message
+  var messages = [];
+  if (streak >= 4) messages.push('\uD83D\uDD25 ' + streak + ' weken streak!');
+  else if (streak >= 2) messages.push('\uD83D\uDCAA ' + streak + ' weken bezig!');
+  if (thisWeek >= 3) messages.push('\uD83C\uDF1F Top week!');
+  else if (thisWeek >= 1) messages.push('\u2705 ' + thisWeek + 'x deze week');
+  if (total >= 10 && total < 15) messages.push('\uD83C\uDF89 Al ' + total + ' trainingen!');
+  if (total >= 25) messages.push('\uD83C\uDFC6 ' + total + ' sessies voltooid!');
+  if (phase === 2) messages.push('\u2B50 Fase 2');
+
+  if (messages.length === 0) return '';
+
+  var html = '<div class="motivation-strip">';
+  html += messages.slice(0, 3).join(' &nbsp;\u00b7&nbsp; ');
+  html += '</div>';
+  return html;
+}
+
+// ================================================================
+// VANDAAG ANDERS? — Alternative options on training days
+// ================================================================
+function renderVandaagAnders(currentTrainingKey) {
+  var html = '';
+  html += '<div class="vandaag-anders-section" style="margin:16px">';
+  html += '<div class="vandaag-anders-toggle" onclick="toggleVandaagAnders(this)" style="text-align:center;padding:10px;color:var(--text-light);font-size:13px;cursor:pointer;border-radius:12px;background:var(--card);border:1px solid var(--border)">';
+  html += '\uD83D\uDD04 Vandaag anders? \u25BC</div>';
+  html += '<div class="vandaag-anders-options" style="display:none;margin-top:8px">';
+
+  // Option 1: Loopband wandelen
+  html += '<div class="vandaag-anders-item" onclick="startLoopbandWandelen()" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--card);border-radius:12px;margin-bottom:8px;cursor:pointer;border:1px solid var(--border)">';
+  html += '<span style="font-size:22px">\uD83D\uDEB6\u200D\u2640\uFE0F</span>';
+  html += '<div style="flex:1"><div style="font-weight:600;font-size:14px">Loopband wandelen</div>';
+  html += '<div style="font-size:12px;color:var(--text-light)">Rustig 30 min wandelen \u2014 laagdrempelig maar effectief</div></div>';
+  html += '<span style="color:var(--text-light);font-size:12px">\u25B6</span></div>';
+
+  // Option 2: Stretchen
+  html += '<div class="vandaag-anders-item" onclick="startStretchTimer()" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--card);border-radius:12px;margin-bottom:8px;cursor:pointer;border:1px solid var(--border)">';
+  html += '<span style="font-size:22px">\uD83E\uDDD8</span>';
+  html += '<div style="flex:1"><div style="font-weight:600;font-size:14px">Alleen stretchen</div>';
+  html += '<div style="font-size:12px;color:var(--text-light)">5 minuten stretch routine \u2014 beter dan niks!</div></div>';
+  html += '<span style="color:var(--text-light);font-size:12px">\u25B6</span></div>';
+
+  // Option 3: Vrije training (choose something else)
+  html += '<div class="vandaag-anders-item" onclick="openVrijeTraining()" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--card);border-radius:12px;margin-bottom:8px;cursor:pointer;border:1px solid var(--border)">';
+  html += '<span style="font-size:22px">\uD83C\uDFCB\uFE0F</span>';
+  html += '<div style="flex:1"><div style="font-weight:600;font-size:14px">Zelf kiezen</div>';
+  html += '<div style="font-size:12px;color:var(--text-light)">Kies een andere training uit de lijst</div></div>';
+  html += '<span style="color:var(--text-light);font-size:12px">\u25B6</span></div>';
+
+  // Option 4: Skip entirely
+  html += '<div class="vandaag-anders-item" onclick="skipTrainingToday()" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--card);border-radius:12px;cursor:pointer;border:1px solid var(--border)">';
+  html += '<span style="font-size:22px">\uD83D\uDE34</span>';
+  html += '<div style="flex:1"><div style="font-weight:600;font-size:14px">Vandaag overslaan</div>';
+  html += '<div style="font-size:12px;color:var(--text-light)">Rustdag \u2014 morgen weer een nieuwe kans</div></div>';
+  html += '<span style="color:var(--text-light);font-size:12px">\u2714\uFE0F</span></div>';
+
+  html += '</div></div>';
+  return html;
+}
+
+function toggleVandaagAnders(el) {
+  var panel = el.nextElementSibling;
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+    el.innerHTML = '\uD83D\uDD04 Vandaag anders? \u25B2';
+  } else {
+    panel.style.display = 'none';
+    el.innerHTML = '\uD83D\uDD04 Vandaag anders? \u25BC';
+  }
+}
+
+function skipTrainingToday() {
+  // Log a rest/skip day so it shows in history
+  var today = new Date().toISOString().split('T')[0];
+  var sessions = getStore('sessions', []);
+
+  // Check if already skipped today
+  var alreadySkipped = sessions.some(function(s) {
+    return s.date === today && s.type === 'skip';
+  });
+  if (alreadySkipped) {
+    alert('Je hebt vandaag al overgeslagen');
+    return;
+  }
+
+  sessions.push({
+    date: today,
+    type: 'skip',
+    name: 'Rustdag (overgeslagen)',
+    duration: 0
+  });
+  setStore('sessions', sessions);
+
+  // Show confirmation
+  var content = document.getElementById('todayContent');
+  var html = '<div class="card" style="text-align:center;padding:32px 24px">';
+  html += '<div style="font-size:48px;margin-bottom:16px">\uD83D\uDE34</div>';
+  html += '<h2 style="margin:0 0 8px;color:var(--text)">Oké, rustdag!</h2>';
+  html += '<p style="color:var(--text-light);font-size:14px;margin:0 0 20px">Geen stress \u2014 luisteren naar je lichaam is ook belangrijk. Morgen weer een nieuwe kans!</p>';
+  html += '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">';
+  html += '<button class="start-btn-primary" onclick="startLoopbandWandelen()" style="flex:1;min-width:140px">\uD83D\uDEB6 Toch even wandelen?</button>';
+  html += '<button class="start-btn-primary" onclick="startStretchTimer()" style="flex:1;min-width:140px;background:var(--card);color:var(--text);border:1px solid var(--border)">\uD83E\uDDD8 Stretchen?</button>';
+  html += '</div></div>';
+  content.innerHTML = html;
+}
+
 function renderToday() {
   var now = new Date();
   var weekType = getWeekType();
@@ -644,47 +1430,136 @@ function renderToday() {
   var content = document.getElementById('todayContent');
   var trainingKey = schedule[dayOfWeek];
 
+  // Build motivation strip + weekly summary
+  var motivHtml = renderWeekSummary() + renderMotivationStrip();
+
   if (!trainingKey) {
-    renderRestDay(content, dayOfWeek);
+    renderRestDay(content, dayOfWeek, motivHtml);
     return;
   }
 
   var training = TRAINING_DATA[trainingKey];
   if (training.type === 'kracht') {
-    renderKrachtOverview(content, training, trainingKey, todayKey);
+    renderKrachtOverview(content, training, trainingKey, todayKey, motivHtml);
   } else {
-    renderCardioOverview(content, training, trainingKey);
+    renderCardioOverview(content, training, trainingKey, motivHtml);
   }
 }
 
-function renderRestDay(container, dayOfWeek) {
-  var isCycling = [1,2,4].includes(dayOfWeek);
-  var html = '<div class="card"><div class="rest-day-msg">';
+function renderRestDay(container, dayOfWeek, motivHtml) {
+  var isCycling = [1,4].includes(dayOfWeek);
+  var html = (motivHtml || '') + '<div class="card"><div class="rest-day-msg">';
   html += '<div class="emoji">' + (isCycling ? '\uD83D\uDEB4' : '\uD83D\uDE0C') + '</div>';
   html += '<h2>' + (isCycling ? 'Fietsdag' : 'Rustdag') + '</h2>';
-  html += '<p>' + (isCycling
-    ? 'Vandaag fiets je naar school en terug \u2014 dat is al \u00b130 min cardio.'
-    : 'Rust is onderdeel van de training. Je lichaam herstelt en wordt sterker.'
-  ) + '</p></div></div>';
+  if (isCycling) {
+    html += '<p>Vandaag fiets je naar school en terug \u2014 dat is al \u00b130 min cardio.</p>';
+    html += '<div style="margin-top:12px;padding:10px 14px;background:rgba(39,174,96,0.06);border-radius:10px;font-size:13px;color:var(--text);line-height:1.5">';
+    html += '\uD83D\uDEB6 <strong>Beweegadvies:</strong> Probeer vandaag ook even te wandelen \u2014 20\u201330 minuten (\u00b12.000\u20133.000 stappen) is al prima. Bijv. een rondje met Milou, of even naar de winkel.';
+    html += '</div>';
+  } else {
+    html += '<p>Vandaag geen zwaar programma. Licht bewegen of stretchen helpt je lichaam sneller herstellen.</p>';
+    html += '<div style="margin-top:12px;padding:10px 14px;background:rgba(39,174,96,0.06);border-radius:10px;font-size:13px;color:var(--text);line-height:1.5">';
+    html += '\uD83D\uDEB6 <strong>Beweegadvies:</strong> Probeer vandaag 30\u201345 minuten te wandelen (\u00b13.000\u20134.500 stappen). Goed voor herstel en vetverbranding \u2014 een wandeling buiten of op de loopband.';
+    html += '</div>';
+  }
+  html += '</div></div>';
+
+  // Slimme rustdag-tips op basis van recente data
+  var smartTip = getSmartRestDayTip(dayOfWeek, isCycling);
+  if (smartTip) {
+    html += '<div class="recovery-warning">' + smartTip + '</div>';
+  }
+
+  // Kuit-tips op fietsdagen
+  if (isCycling) {
+    html += '<div class="card kuit-tips-card">';
+    html += '<div class="kuit-tips-header" onclick="toggleKuitTips(this)" style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:4px 0">';
+    html += '<span>\uD83E\uDDB5</span><span style="font-weight:600;font-size:14px">Tips tegen kuitpijn na het fietsen</span>';
+    html += '<span class="kuit-arrow" style="margin-left:auto;font-size:12px;color:var(--text-light)">\u25BC</span></div>';
+    html += '<div class="kuit-tips-body" style="display:none;margin-top:12px;font-size:13px;color:var(--text-light);line-height:1.6">';
+    html += '<p style="margin:0 0 8px"><strong>Zadelhoogte:</strong> Hiel op het pedaal in de laagste stand \u2192 been net gestrekt. Te laag = kuiten overbelasten.</p>';
+    html += '<p style="margin:0 0 8px"><strong>Voetpositie:</strong> Trap met de bal van je voet, niet met je tenen.</p>';
+    html += '<p style="margin:0 0 8px"><strong>Cadans:</strong> Liever lichter verzet en sneller trappen (70\u201390 rpm) dan zwaar en langzaam.</p>';
+    html += '<p style="margin:0 0 8px"><strong>Schoenen:</strong> Stevigere zool = minder kuitwerk. Zachte slippers vermijden.</p>';
+    html += '<p style="margin:0 0 12px"><strong>Na het fietsen:</strong> 30 sec kuiten stretchen per been (voorvoet op traptrede, hiel omlaag).</p>';
+    html += '<p style="margin:0;padding:10px;background:var(--card);border-radius:8px;border:1px solid var(--border)"><strong>\uD83C\uDFCB\uFE0F Kuit-oefeningetje (2 min/dag):</strong><br>';
+    html += 'Ga met je voorvoeten op een traptrede staan (hielen hangen vrij). Laat je hielen langzaam zakken tot je een rek voelt in je kuiten. Duw daarna omhoog op je tenen \u2014 dit mag met beide benen tegelijk. Doe dit 2\u00d78 per been. Het mag "trekken" maar niet steken.</p>';
+    html += '</div></div>';
+  }
+
+  // Licht bewegen optie (altijd beschikbaar)
+  html += '<div class="card" style="margin:12px 16px">';
+  html += '<div class="card-header"><span class="icon">\uD83D\uDEB6\u200D\u2640\uFE0F</span><div style="flex:1">';
+  html += '<div style="font-size:15px;font-weight:600">Licht bewegen</div>';
+  html += '<div style="font-size:12px;color:var(--text-light)">Actief herstellen is beter dan stilzitten</div>';
+  html += '</div></div>';
+  html += '<div style="padding:12px 16px;font-size:13px;color:var(--text-light);line-height:1.6">';
+  html += 'Licht bewegen helpt je spieren herstellen. Ga 15\u201330 minuten op de loopband wandelen (5\u20136 km/u), rustig fietsen, of maak een wandeling buiten. Houd het ontspannen \u2014 je moet gewoon kunnen praten.';
+  html += '</div>';
+  html += '<div style="padding:0 16px 12px">';
+  html += '<button class="start-btn-primary" onclick="startLoopbandWandelen()" style="width:100%;margin:0">Start loopband wandelen</button>';
+  html += '</div></div>';
+
+  // Stretch routine
+  html += '<div class="card" style="margin:12px 16px">';
+  html += '<div class="card-header" onclick="toggleStretchRoutine(this)" style="cursor:pointer">';
+  html += '<span class="icon">\uD83E\uDDD8</span><div style="flex:1">';
+  html += '<div style="font-size:15px;font-weight:600">5-minuten stretch routine</div>';
+  html += '<div style="font-size:12px;color:var(--text-light)">Houd je lichaam soepel op rustdagen</div>';
+  html += '</div><span class="stretch-arrow" style="font-size:12px;color:var(--text-light)">\u25BC</span></div>';
+  html += '<div class="stretch-body" style="display:none">';
+
+  STRETCH_ROUTINES.forEach(function(s, idx) {
+    html += '<div class="stretch-item" style="padding:12px 16px;border-top:1px solid var(--border)">';
+    html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">';
+    html += '<span style="font-size:13px;font-weight:700;color:var(--primary);min-width:20px">' + (idx + 1) + '</span>';
+    html += '<div style="flex:1"><div style="font-weight:600;font-size:14px">' + s.name + '</div>';
+    html += '<div style="font-size:12px;color:var(--text-light)">' + s.duur + ' sec' + (s.perKant ? ' per kant' : '') + '</div></div>';
+    html += '<button class="stretch-video-btn" onclick="toggleStretchDetail(\'' + s.id + '\')" style="background:none;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--primary);cursor:pointer">Uitleg</button>';
+    html += '</div>';
+    html += '<div id="stretchDetail_' + s.id + '" style="display:none;margin-top:8px;margin-left:30px">';
+    if (s.videoUrl) {
+      html += '<div style="text-align:center;margin-bottom:8px"><video class="exercise-video" src="' + s.videoUrl + '" autoplay loop muted playsinline style="max-width:280px;border-radius:10px" onerror="this.parentElement.style.display=\'none\'"></video></div>';
+    }
+    html += '<p style="font-size:13px;color:var(--text-light);line-height:1.5;margin:0 0 6px">' + s.instruction + '</p>';
+    html += '<div style="font-size:12px;color:var(--success)">\u2714\uFE0F ' + s.focus + '</div>';
+    html += '</div>';
+    html += '</div>';
+  });
+
+  html += '<div style="padding:12px 16px;border-top:1px solid var(--border)">';
+  html += '<button class="start-btn-primary" onclick="startStretchTimer()" style="width:100%;margin:0">Start stretch timer (\u00b15 min)</button>';
+  html += '</div>';
+  html += '</div></div>';
+
   html += '<button class="vrije-training-btn" onclick="openVrijeTraining()">Toch zin om te trainen?</button>';
   container.innerHTML = html;
 }
 
-function renderKrachtOverview(container, training, trainingKey, todayKey) {
+function renderKrachtOverview(container, training, trainingKey, todayKey, motivHtml) {
   var daysSince = daysSinceLastTraining();
+  var recoveryWarning = getRecoveryWarningForTraining(trainingKey);
 
-  var html = '<div class="card">';
+  var html = (motivHtml || '');
+
+  // Herstelwaarschuwing
+  if (recoveryWarning) {
+    html += '<div class="recovery-warning">' + recoveryWarning + '</div>';
+  }
+
+  html += '<div class="card">';
   html += '<div class="card-header"><span class="icon">\uD83C\uDFCB</span><div>';
   html += '<div style="font-size:20px;font-weight:700;color:var(--primary)">' + training.name + '</div>';
-  html += '<div style="font-size:13px;color:var(--text-light)">3 rondes \u00b7 \u00b145 min</div>';
+  html += '<div style="font-size:13px;color:var(--text-light)">3 sets per oefening \u00b7 \u00b145 min</div>';
   html += '</div></div>';
 
   // Warmup
   html += '<div class="phase-block"><div class="phase-icon">\uD83D\uDD25</div>';
   html += '<div class="phase-text"><strong>Warming-up:</strong> ' + training.warmup.apparaat + ' ' + training.warmup.duur + ' \u2014 ' + training.warmup.detail + '</div></div>';
 
-  // Exercise preview list
-  training.exerciseIds.forEach(function(exId) {
+  // Exercise preview list (phase-aware)
+  var phaseExercises = getTrainingExercises(trainingKey);
+  phaseExercises.forEach(function(exId) {
     var ex = getExercise(exId);
     if (!ex) return;
     var prevWeight = getLastWeight(exId);
@@ -733,6 +1608,9 @@ function renderKrachtOverview(container, training, trainingKey, todayKey) {
   // Start button
   html += '<button class="start-training-btn" onclick="startTrainingMode(\'' + trainingKey + '\')">Training starten \u25B6</button>';
 
+  // Vandaag anders? section
+  html += renderVandaagAnders(trainingKey);
+
   container.innerHTML = html;
 }
 
@@ -741,27 +1619,284 @@ function toggleOverviewInstruction(exId) {
   if (el) el.classList.toggle('show');
 }
 
-function renderCardioOverview(container, training, trainingKey) {
-  var html = '<div class="card">';
+function isCardioPhase2() {
+  // Cardio phase 2 unlocks after 6+ cardio sessions with no high calf pain in the last 4
+  var sessions = getStore('sessions', []);
+  var cardioSessions = sessions.filter(function(s) { return s.type === 'cardio'; });
+  if (cardioSessions.length < 6) return false;
+  var last4 = cardioSessions.slice(-4);
+  var highPain = last4.some(function(s) {
+    return s.feedback && s.feedback.calfPain >= 2;
+  });
+  return !highPain;
+}
+
+function getFilteredOptions(training) {
+  var phase2 = isCardioPhase2();
+  var filtered = [];
+  training.options.forEach(function(opt, i) {
+    if (!opt.phase2Only || phase2) {
+      filtered.push({ opt: opt, originalIdx: i });
+    }
+  });
+  return filtered;
+}
+
+function renderCardioOverview(container, training, trainingKey, motivHtml) {
+  var filteredOpts = getFilteredOptions(training);
+
+  var html = (motivHtml || '') + '<div class="card">';
   html += '<div class="card-header"><span class="icon">\uD83D\uDCA8</span><div>';
   html += '<div style="font-size:20px;font-weight:700;color:var(--primary)">' + training.name + '</div>';
+
+  // If only one option, no need to choose
+  if (filteredOpts.length === 1) {
+    var singleItem = filteredOpts[0];
+    var singleMin = singleItem.opt.phases.reduce(function(t, p) { return t + p.duur; }, 0);
+    html += '<div style="font-size:13px;color:var(--text-light)">' + singleMin + ' min</div>';
+    html += '</div></div>';
+    html += '<button class="start-btn-primary" onclick="startCardioTimer(\'' + trainingKey + '\',' + singleItem.originalIdx + ')">Start ' + singleItem.opt.name + ' (' + singleMin + ' min)</button>';
+    html += '</div>';
+    container.innerHTML = html;
+    return;
+  }
+
   html += '<div style="font-size:13px;color:var(--text-light)">Kies je apparaat</div>';
   html += '</div></div>';
 
-  training.options.forEach(function(opt, i) {
-    var totalMin = opt.phases.reduce(function(t, p) { return t + p.duur; }, 0);
-    html += '<div class="exercise-item" style="cursor:pointer" onclick="startCardioTimer(\'' + trainingKey + '\',' + i + ')">';
-    html += '<div class="ex-top">';
-    html += '<div class="ex-info"><div class="ex-name">' + opt.name + '</div>';
-    html += '<div class="ex-detail">' + totalMin + ' min \u00b7 ';
-    html += opt.phases.map(function(p) { return p.name; }).join(' \u2192 ');
-    html += '</div></div>';
-    html += '<div class="ex-expand">\u25B6</div>';
-    html += '</div></div>';
+  // Find primary option (or first)
+  var primaryFiltered = filteredOpts[0];
+  filteredOpts.forEach(function(item) {
+    if (item.opt.isPrimary) primaryFiltered = item;
   });
 
+  // Show primary option as prominent button
+  var primaryMin = primaryFiltered.opt.phases.reduce(function(t, p) { return t + p.duur; }, 0);
+  html += '<button class="start-btn-primary" onclick="startCardioTimer(\'' + trainingKey + '\',' + primaryFiltered.originalIdx + ')">';
+  html += 'Start ' + primaryFiltered.opt.name + ' (' + primaryMin + ' min)</button>';
+
+  // Show interval badge if phase 2 option is available
+  if (filteredOpts.some(function(item) { return item.opt.phase2Only; })) {
+    html += '<div style="text-align:center;padding:4px;font-size:11px;color:var(--success)">\u2B50 Interval-optie beschikbaar \u2014 je hebt genoeg sessies zonder kuitpijn!</div>';
+  }
+
+  // Other options collapsible — subtle styling
+  var others = [];
+  filteredOpts.forEach(function(item) {
+    if (item.originalIdx !== primaryFiltered.originalIdx) others.push({ opt: item.opt, idx: item.originalIdx });
+  });
+
+  if (others.length > 0) {
+    html += '<div class="other-cardio-toggle" onclick="toggleOtherCardio(this)" style="text-align:center;padding:8px;color:var(--text-light);font-size:13px;cursor:pointer">Andere opties \u25BC</div>';
+    html += '<div class="other-cardio-options" style="display:none">';
+    others.forEach(function(item) {
+      var totalMin = item.opt.phases.reduce(function(t, p) { return t + p.duur; }, 0);
+      html += '<div class="other-cardio-item" onclick="startCardioTimer(\'' + trainingKey + '\',' + item.idx + ')">';
+      html += '<div><div class="oc-name">' + item.opt.name + '</div>';
+      html += '<div class="oc-detail">' + totalMin + ' min \u00b7 ';
+      html += item.opt.phases.map(function(p) { return p.name; }).join(' \u2192 ');
+      html += '</div></div>';
+      html += '<span style="color:var(--text-light);font-size:12px">\u25B6</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
   html += '</div>';
+
+  // Vandaag anders? section
+  html += renderVandaagAnders(trainingKey);
+
   container.innerHTML = html;
+}
+
+function toggleOtherCardio(el) {
+  var panel = el.nextElementSibling;
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+    el.textContent = 'Andere opties \u25B2';
+  } else {
+    panel.style.display = 'none';
+    el.textContent = 'Andere opties \u25BC';
+  }
+}
+
+function toggleKuitTips(el) {
+  var body = el.nextElementSibling;
+  var arrow = el.querySelector('.kuit-arrow');
+  if (body.style.display === 'none') {
+    body.style.display = 'block';
+    arrow.textContent = '\u25B2';
+  } else {
+    body.style.display = 'none';
+    arrow.textContent = '\u25BC';
+  }
+}
+
+function toggleMeetAdvies(btn) {
+  var panel = btn.nextElementSibling;
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+    btn.textContent = 'Hoe meet ik goed? \u25B2';
+  } else {
+    panel.style.display = 'none';
+    btn.textContent = 'Hoe meet ik goed? \u25BC';
+  }
+}
+
+function toggleStretchRoutine(headerEl) {
+  var body = headerEl.nextElementSibling;
+  var arrow = headerEl.querySelector('.stretch-arrow');
+  if (body.style.display === 'none') {
+    body.style.display = 'block';
+    arrow.textContent = '\u25B2';
+  } else {
+    body.style.display = 'none';
+    arrow.textContent = '\u25BC';
+  }
+}
+
+function toggleStretchDetail(id) {
+  var el = document.getElementById('stretchDetail_' + id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+var stretchTimerInterval = null;
+var stretchCurrentIdx = 0;
+var stretchSide = 0; // 0 = links/beide, 1 = rechts
+
+function startStretchTimer() {
+  stretchCurrentIdx = 0;
+  stretchSide = 0;
+  showStretchTimerOverlay();
+  runStretchStep();
+}
+
+function showStretchTimerOverlay() {
+  var overlay = document.createElement('div');
+  overlay.id = 'stretchOverlay';
+  overlay.className = 'training-mode active';
+  overlay.innerHTML = '<div class="tm-header"><h2>Stretch routine</h2>' +
+    '<button class="tm-close" onclick="stopStretchTimer()">Stoppen</button></div>' +
+    '<div class="tm-progress"><div class="tm-progress-bar" id="stretchProgressBar" style="width:0%"></div></div>' +
+    '<div class="tm-body" id="stretchBody"></div>';
+  document.body.appendChild(overlay);
+  document.getElementById('bottomNav').style.display = 'none';
+}
+
+function runStretchStep() {
+  if (stretchCurrentIdx >= STRETCH_ROUTINES.length) {
+    finishStretchRoutine();
+    return;
+  }
+
+  var s = STRETCH_ROUTINES[stretchCurrentIdx];
+  var body = document.getElementById('stretchBody');
+  if (!body) return;
+
+  // Update progress
+  var total = STRETCH_ROUTINES.reduce(function(t, r) { return t + (r.perKant ? 2 : 1); }, 0);
+  var done = 0;
+  for (var i = 0; i < stretchCurrentIdx; i++) {
+    done += STRETCH_ROUTINES[i].perKant ? 2 : 1;
+  }
+  done += stretchSide;
+  var pctBar = Math.round((done / total) * 100);
+  var bar = document.getElementById('stretchProgressBar');
+  if (bar) bar.style.width = pctBar + '%';
+
+  var sideLabel = '';
+  if (s.perKant) sideLabel = stretchSide === 0 ? ' (links)' : ' (rechts)';
+
+  var html = '<div class="tm-warmup-cooldown">';
+  html += '<div style="font-size:14px;color:var(--primary-light);font-weight:600;margin-bottom:12px">' + (stretchCurrentIdx + 1) + ' / ' + STRETCH_ROUTINES.length + sideLabel + '</div>';
+  html += '<div class="tm-exercise-name" style="font-size:24px;margin-bottom:8px">' + s.name + '</div>';
+
+  // Instruction FIRST (always visible)
+  html += '<div style="font-size:14px;color:var(--text);line-height:1.6;max-width:320px;margin:0 auto 12px;padding:12px 16px;background:var(--card);border-radius:10px;text-align:left">' + s.instruction + '</div>';
+  html += '<div style="font-size:13px;color:var(--success);margin-bottom:12px">\u2714\uFE0F ' + s.focus + '</div>';
+
+  if (s.videoUrl) {
+    html += '<div style="margin:0 0 12px"><video src="' + s.videoUrl + '" autoplay loop muted playsinline style="width:100%;max-width:280px;border-radius:12px" onerror="this.parentElement.style.display=\'none\'"></video></div>';
+  }
+
+  html += '<div class="tm-timer" id="stretchTimerDisplay" style="font-size:56px">' + s.duur + '</div>';
+  html += '<button class="tm-btn tm-btn-accent" onclick="startStretchCountdown(' + s.duur + ')">Start ' + s.duur + ' sec</button>';
+  html += '<button class="tm-btn tm-btn-outline tm-btn-small" onclick="skipStretchStep()">Overslaan</button>';
+  html += '</div>';
+  body.innerHTML = html;
+}
+
+function startStretchCountdown(seconds) {
+  var remaining = seconds;
+  var body = document.getElementById('stretchBody');
+  var s = STRETCH_ROUTINES[stretchCurrentIdx];
+  var sideLabel = '';
+  if (s.perKant) sideLabel = stretchSide === 0 ? ' (links)' : ' (rechts)';
+
+  // Rebuild with timer running
+  var html = '<div class="tm-warmup-cooldown">';
+  html += '<div style="font-size:14px;color:var(--primary-light);font-weight:600;margin-bottom:12px">' + (stretchCurrentIdx + 1) + ' / ' + STRETCH_ROUTINES.length + sideLabel + '</div>';
+  html += '<div class="tm-exercise-name" style="font-size:22px;margin-bottom:8px">' + s.name + '</div>';
+
+  // Instruction stays visible during timer
+  html += '<div style="font-size:13px;color:var(--text-light);line-height:1.5;max-width:300px;margin:0 auto 8px">' + s.instruction + '</div>';
+
+  html += '<div style="font-size:13px;color:var(--success);margin-bottom:8px">\u2714\uFE0F ' + s.focus + '</div>';
+  html += '<div class="tm-timer cooldown" id="stretchTimerDisplay" style="font-size:64px">' + remaining + '</div>';
+  html += '<div style="font-size:14px;color:var(--text-light)">Houd vast en adem rustig door</div>';
+  html += '</div>';
+  body.innerHTML = html;
+
+  clearInterval(stretchTimerInterval);
+  stretchTimerInterval = setInterval(function() {
+    remaining--;
+    var display = document.getElementById('stretchTimerDisplay');
+    if (display) display.textContent = remaining;
+    if (remaining <= 0) {
+      clearInterval(stretchTimerInterval);
+      if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
+      advanceStretchStep();
+    }
+  }, 1000);
+}
+
+function skipStretchStep() {
+  clearInterval(stretchTimerInterval);
+  advanceStretchStep();
+}
+
+function advanceStretchStep() {
+  var s = STRETCH_ROUTINES[stretchCurrentIdx];
+  if (s.perKant && stretchSide === 0) {
+    stretchSide = 1;
+  } else {
+    stretchCurrentIdx++;
+    stretchSide = 0;
+  }
+  runStretchStep();
+}
+
+function finishStretchRoutine() {
+  var body = document.getElementById('stretchBody');
+  if (!body) return;
+  var bar = document.getElementById('stretchProgressBar');
+  if (bar) bar.style.width = '100%';
+
+  var html = '<div class="completion-screen">';
+  html += '<div class="emoji">\uD83E\uDDD8</div>';
+  html += '<h2>Lekker gestretcht!</h2>';
+  html += '<p style="color:var(--text-light);margin-bottom:24px">Je lichaam bedankt je. Stretchen op rustdagen helpt je sneller herstellen.</p>';
+  html += '<button class="tm-btn tm-btn-success" onclick="stopStretchTimer()">Klaar</button>';
+  html += '</div>';
+  body.innerHTML = html;
+}
+
+function stopStretchTimer() {
+  clearInterval(stretchTimerInterval);
+  var overlay = document.getElementById('stretchOverlay');
+  if (overlay) overlay.remove();
+  document.getElementById('bottomNav').style.display = 'flex';
 }
 
 // ================================================================
@@ -783,28 +1918,50 @@ function openVrijeTraining() {
 
   var options = [
     { key: 'krachtBoven', name: 'Kracht: bovenlichaam', desc: 'Chest press, shoulder press, dumbbell row, plank' },
-    { key: 'krachtOnder', name: 'Kracht: onderlichaam', desc: 'Leg extension, leg curl, chest press, plank' },
-    { key: 'cardioVariatie', name: 'Cardio variatie (45 min)', desc: 'Crosstrainer, hometrainer of buiten fietsen' },
+    { key: 'krachtOnder', name: 'Kracht: onderlichaam', desc: 'Leg curl, leg extension, chest press, plank' },
+    { key: 'loopbandWandelen', name: 'Loopband wandelen (35 min)', desc: 'Rustig wandelen op de loopband' },
+    { key: 'cardioVariatie', name: 'Cardio variatie (40\u201345 min)', desc: 'Crosstrainer, loopband of recumbent bike' },
     { key: 'cardioLicht', name: 'Lichte cardio (30 min)', desc: 'Loopband, crosstrainer of hometrainer' },
   ];
 
-  var html = '';
+  // Determine warnings per option
+  var goodOptions = [];
+  var warnOptions = [];
   options.forEach(function(opt) {
     var warning = '';
     if (tomorrowTraining && TRAINING_DATA[tomorrowTraining] && TRAINING_DATA[tomorrowTraining].type === 'kracht' &&
         (opt.key === 'krachtBoven' || opt.key === 'krachtOnder')) {
-      warning = '<div class="opt-warn">\u26A0 Morgen staat krachttraining gepland \u2014 lichte cardio is misschien slimmer</div>';
+      warning = '\u26A0 Morgen staat krachttraining gepland \u2014 lichte cardio is misschien slimmer';
     }
     if (yesterdayTraining && TRAINING_DATA[yesterdayTraining] && TRAINING_DATA[yesterdayTraining].type === 'kracht' &&
         (opt.key === 'krachtBoven' || opt.key === 'krachtOnder')) {
-      warning = '<div class="opt-warn">\u26A0 Gisteren was krachttraining \u2014 een rustdag ertussen is beter</div>';
+      warning = '\u26A0 Gisteren was krachttraining \u2014 een rustdag ertussen is beter';
     }
-
-    html += '<div class="modal-option ' + (warning ? 'warning' : '') + '" onclick="selectVrijeTraining(\'' + opt.key + '\')">';
-    html += '<div class="opt-title">' + opt.name + '</div>';
-    html += '<div class="opt-desc">' + opt.desc + '</div>';
-    html += warning + '</div>';
+    opt._warning = warning;
+    if (warning) { warnOptions.push(opt); } else { goodOptions.push(opt); }
   });
+
+  // Render good options first (with green accent), then warned options (dimmed)
+  var html = '';
+  if (goodOptions.length > 0) {
+    html += '<div style="font-size:12px;color:var(--success);font-weight:600;padding:8px 16px 4px">\u2705 Aanbevolen voor vandaag</div>';
+    goodOptions.forEach(function(opt) {
+      html += '<div class="modal-option recommended" onclick="selectVrijeTraining(\'' + opt.key + '\')">';
+      html += '<div class="opt-title">' + opt.name + '</div>';
+      html += '<div class="opt-desc">' + opt.desc + '</div>';
+      html += '</div>';
+    });
+  }
+  if (warnOptions.length > 0) {
+    html += '<div style="font-size:12px;color:var(--text-light);padding:12px 16px 4px;border-top:1px solid var(--border);margin-top:4px">Minder geschikt vandaag</div>';
+    warnOptions.forEach(function(opt) {
+      html += '<div class="modal-option warning" onclick="selectVrijeTraining(\'' + opt.key + '\')">';
+      html += '<div class="opt-title">' + opt.name + '</div>';
+      html += '<div class="opt-desc">' + opt.desc + '</div>';
+      html += '<div class="opt-warn">' + opt._warning + '</div>';
+      html += '</div>';
+    });
+  }
 
   opts.innerHTML = html;
   modal.classList.add('show');
@@ -830,60 +1987,758 @@ function closeModal() {
 // ================================================================
 function renderHistory() {
   var sessions = getStore('sessions', []);
-  var list = document.getElementById('historyList');
+  var measurements = getStore('measurements', []);
+  var container = document.getElementById('pageHistory');
 
-  if (sessions.length === 0) {
-    list.innerHTML = '<div class="history-empty"><div class="emoji">\uD83D\uDCDD</div><p>Nog geen trainingen.<br>Na je eerste training verschijnt hier je geschiedenis.</p></div>';
+  var html = '';
+
+  // ── STREAK & STATS SUMMARY ──
+  html += '<div class="card">';
+  html += '<div class="card-header"><span class="icon">\uD83D\uDCC8</span> Overzicht</div>';
+  html += '<div class="stats-grid">';
+
+  // Total sessions
+  html += '<div class="stat-box"><div class="stat-num">' + sessions.length + '</div><div class="stat-label">Trainingen</div></div>';
+
+  // Current streak
+  var streak = calcStreak(sessions);
+  html += '<div class="stat-box"><div class="stat-num">' + streak + '</div><div class="stat-label">Weken op rij</div></div>';
+
+  // This week count
+  var thisWeekCount = countThisWeek(sessions);
+  html += '<div class="stat-box"><div class="stat-num">' + thisWeekCount + '</div><div class="stat-label">Deze week</div></div>';
+
+  // Average energy
+  var avgEnergy = calcAvgEnergy(sessions);
+  html += '<div class="stat-box"><div class="stat-num">' + (avgEnergy > 0 ? avgEnergy.toFixed(1) : '-') + '</div><div class="stat-label">Gem. energie</div></div>';
+
+  html += '</div></div>';
+
+  // ── WEIGHT PROGRESSION PER EXERCISE ──
+  var exerciseHistory = buildExerciseHistory(sessions);
+  var exerciseKeys = Object.keys(exerciseHistory);
+  if (exerciseKeys.length > 0) {
+    html += '<div class="card">';
+    html += '<div class="card-header"><span class="icon">\uD83C\uDFCB</span> Gewichtsprogressie</div>';
+    exerciseKeys.forEach(function(exId) {
+      var ex = getExercise(exId);
+      if (!ex) return;
+      var history = exerciseHistory[exId];
+      if (history.length < 1) return;
+      var latest = history[history.length - 1];
+      var first = history[0];
+      var diff = latest.weight - first.weight;
+      var diffStr = diff > 0 ? '+' + diff + ' kg' : (diff < 0 ? diff + ' kg' : 'gelijk');
+      var diffColor = diff > 0 ? 'var(--success)' : (diff < 0 ? '#E74C3C' : 'var(--text-light)');
+
+      html += '<div class="progress-exercise">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+      html += '<span style="font-weight:600;font-size:14px">' + ex.name + '</span>';
+      html += '<span style="font-size:13px;color:' + diffColor + ';font-weight:600">' + latest.weight + ' kg <span style="font-size:11px">(' + diffStr + ')</span></span>';
+      html += '</div>';
+
+      // Simple bar chart
+      var maxW = Math.max.apply(null, history.map(function(h) { return h.weight; }));
+      if (maxW > 0) {
+        html += '<div class="mini-chart" style="display:flex;align-items:flex-end;gap:2px;height:32px">';
+        history.slice(-10).forEach(function(h) {
+          var pct = maxW > 0 ? (h.weight / maxW * 100) : 0;
+          html += '<div style="flex:1;background:var(--primary);border-radius:2px 2px 0 0;min-height:2px;height:' + pct + '%" title="' + h.date + ': ' + h.weight + ' kg"></div>';
+        });
+        html += '</div>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  // ── CALF PAIN TRACKER ──
+  var calfHistory = sessions.filter(function(s) { return s.feedback && s.feedback.calfPain !== null && s.feedback.calfPain !== undefined; });
+  if (calfHistory.length > 0) {
+    html += '<div class="card">';
+    html += '<div class="card-header"><span class="icon">\uD83E\uDDB5</span> Kuitpijn trend</div>';
+    var calfLabels = ['Geen', 'Beetje', 'Best wel', 'Veel'];
+    var calfColors = ['var(--success)', '#F39C12', '#E67E22', '#E74C3C'];
+    html += '<div style="display:flex;align-items:flex-end;gap:3px;height:40px;padding:0 4px">';
+    calfHistory.slice(-14).forEach(function(s) {
+      var val = s.feedback.calfPain;
+      var pct = ((val + 1) / 4) * 100;
+      html += '<div style="flex:1;background:' + calfColors[val] + ';border-radius:2px 2px 0 0;height:' + pct + '%;min-height:4px" title="' + s.date + ': ' + calfLabels[val] + '"></div>';
+    });
+    html += '</div>';
+    var lastCalf = calfHistory[calfHistory.length - 1].feedback.calfPain;
+    html += '<div style="font-size:12px;color:var(--text-light);margin-top:6px;padding:0 4px">Laatste: ' + calfLabels[lastCalf] + '</div>';
+    html += '</div>';
+  }
+
+  // ── BODY MEASUREMENTS ──
+  var weightGoal = getStore('weightGoal', 70);
+  html += '<div class="card">';
+  html += '<div class="card-header"><span class="icon">\uD83D\uDCCF</span> Gewicht & metingen</div>';
+  html += '<div id="measurementsList">';
+  if (measurements.length > 0) {
+    var latestM = measurements[measurements.length - 1];
+    var firstM = measurements[0];
+
+    // Big current weight display with goal
+    html += '<div style="text-align:center;padding:16px 16px 8px">';
+    html += '<div style="font-size:36px;font-weight:700;color:var(--primary)">' + latestM.weight + ' kg</div>';
+    html += '<div style="font-size:13px;color:var(--text-light);margin-top:4px">Doel: ' + weightGoal + ' kg</div>';
+
+    // Progress towards goal (only show from 2nd measurement)
+    if (measurements.length >= 2) {
+      var startWeight = firstM.weight;
+      var totalToLose = startWeight - weightGoal;
+      var lostSoFar = startWeight - latestM.weight;
+      if (totalToLose > 0) {
+        var goalPct = Math.max(0, Math.min(100, Math.round((lostSoFar / totalToLose) * 100)));
+        html += '<div style="background:var(--border);border-radius:8px;height:8px;margin:12px auto;max-width:250px;overflow:hidden">';
+        html += '<div style="background:var(--success);height:100%;width:' + goalPct + '%;border-radius:8px;transition:width 0.3s"></div></div>';
+        html += '<div style="font-size:12px;color:var(--text-light)">' + goalPct + '% van je doel bereikt</div>';
+      }
+    }
+    html += '</div>';
+
+    // Smart motivational message
+    html += '<div style="padding:8px 16px 12px">' + getWeightMessage(measurements, weightGoal) + '</div>';
+
+    // Mini weight chart with goal line (only with 2+ measurements)
+    if (measurements.length >= 2) {
+    html += '<div style="position:relative;padding:0 8px">';
+    html += '<div style="display:flex;align-items:flex-end;gap:3px;height:50px;padding:4px">';
+    var mWeights = measurements.map(function(m) { return m.weight; });
+    var allW = mWeights.concat([weightGoal]);
+    var minM = Math.min.apply(null, allW) - 1;
+    var maxM = Math.max.apply(null, allW) + 1;
+    measurements.slice(-12).forEach(function(m) {
+      var pct = maxM > minM ? ((m.weight - minM) / (maxM - minM) * 100) : 50;
+      var barColor = m.weight <= weightGoal ? 'var(--success)' : 'var(--accent)';
+      html += '<div style="flex:1;background:' + barColor + ';border-radius:2px 2px 0 0;height:' + pct + '%;min-height:4px" title="' + m.date + ': ' + m.weight + ' kg"></div>';
+    });
+    html += '</div>';
+    // Goal line
+    if (maxM > minM) {
+      var goalLinePct = ((weightGoal - minM) / (maxM - minM)) * 100;
+      html += '<div style="position:absolute;left:0;right:0;bottom:' + (goalLinePct * 0.5 + 4) + 'px;border-top:2px dashed var(--success);opacity:0.5"></div>';
+    }
+    html += '</div>';
+    } // end chart if >= 2
+
+    var mDiff = (latestM.weight - firstM.weight).toFixed(1);
+    var mDiffStr = parseFloat(mDiff) > 0 ? '+' + mDiff : mDiff;
+    if (measurements.length >= 2) {
+      html += '<div style="font-size:12px;padding:4px 16px 4px;color:var(--text-light)">' + mDiffStr + ' kg sinds start (' + firstM.date + ')</div>';
+    }
+
+    // Show waist & hip if available
+    var extras = [];
+    if (latestM.waist) extras.push('Taille: ' + latestM.waist + ' cm');
+    if (latestM.hip) extras.push('Heup: ' + latestM.hip + ' cm');
+    if (latestM.waist && latestM.hip) {
+      var ratio = (latestM.waist / latestM.hip).toFixed(2);
+      extras.push('T/H ratio: ' + ratio);
+    }
+    if (extras.length > 0) {
+      html += '<div style="font-size:12px;padding:0 16px 12px;color:var(--text-light)">' + extras.join(' \u00b7 ') + '</div>';
+    }
   } else {
-    var html = '';
+    html += '<div style="padding:14px 18px;color:var(--text-light);font-size:13px">Nog geen metingen. Weeg jezelf en voeg je eerste meting toe!</div>';
+  }
+  html += '</div>';
+
+  // Measurement reminder / timing advice
+  var lastMeasDate = measurements.length > 0 ? measurements[measurements.length - 1].date : null;
+  var daysSinceWeight = lastMeasDate ? Math.floor((new Date() - new Date(lastMeasDate)) / 86400000) : 999;
+
+  // Find last body measurement (taille/heup)
+  var lastBodyMeas = null;
+  for (var bi = measurements.length - 1; bi >= 0; bi--) {
+    if (measurements[bi].waist || measurements[bi].hip) { lastBodyMeas = measurements[bi]; break; }
+  }
+  var daysSinceBody = lastBodyMeas ? Math.floor((new Date() - new Date(lastBodyMeas.date)) / 86400000) : 999;
+  var showBodyFields = daysSinceBody >= 30 || !lastBodyMeas;
+
+  // Last measurement date display
+  if (lastMeasDate) {
+    var lastD = new Date(lastMeasDate);
+    var dateStr = lastD.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' });
+    html += '<div style="padding:6px 16px;font-size:12px;color:var(--text-light)">Laatste weging: ' + dateStr + ' (' + daysSinceWeight + ' dag' + (daysSinceWeight !== 1 ? 'en' : '') + ' geleden)</div>';
+    if (lastBodyMeas && lastBodyMeas.date !== lastMeasDate) {
+      var bodyD = new Date(lastBodyMeas.date);
+      var bodyDateStr = bodyD.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' });
+      html += '<div style="padding:0 16px 4px;font-size:12px;color:var(--text-light)">Laatste taille/heup: ' + bodyDateStr + '</div>';
+    } else if (lastBodyMeas) {
+      html += '<div style="padding:0 16px 4px;font-size:12px;color:var(--text-light)">Laatste taille/heup: ' + dateStr + '</div>';
+    }
+  }
+
+  // Weight reminder (weekly)
+  if (daysSinceWeight >= 7 || measurements.length === 0) {
+    html += '<div style="padding:8px 16px;background:rgba(39,174,96,0.06);border-left:3px solid var(--success);margin:0 0 4px;font-size:13px;color:var(--text)">';
+    html += '\uD83D\uDCC5 ' + (measurements.length === 0 ? 'Tip: weeg jezelf 1x per week.' : 'Het is weer tijd om je te wegen!');
+    html += '</div>';
+  } else {
+    html += '<div style="padding:4px 16px;font-size:12px;color:var(--text-light)">Weeg max 1x per week \u2014 dagelijks wegen geeft onnodig stress.</div>';
+  }
+
+  // Body measurement reminder (monthly)
+  if (showBodyFields) {
+    html += '<div style="padding:8px 16px;background:rgba(52,152,219,0.06);border-left:3px solid var(--primary);margin:4px 0;font-size:13px;color:var(--text)">';
+    html += '\uD83D\uDCCF ' + (!lastBodyMeas ? 'Tip: meet ook je taille & heup \u2014 1x per maand is genoeg.' : 'Tijd voor je maandelijkse taille/heup meting!');
+    html += '</div>';
+  }
+
+  html += '<div class="checkin-form">';
+  html += '<div class="checkin-field"><label>Gewicht (kg)</label><input type="number" step="0.1" id="inputWeight" placeholder="bv. 74.5"></div>';
+
+  // Taille/heup fields: always present but collapsed when not due
+  if (showBodyFields) {
+    html += '<div class="checkin-field"><label>Tailleomtrek (cm)</label><input type="number" step="0.5" id="inputWaist" placeholder="bv. 82"></div>';
+    html += '<div class="checkin-field"><label>Heupomtrek (cm) \u2014 optioneel</label><input type="number" step="0.5" id="inputHip" placeholder="bv. 100"></div>';
+  } else {
+    html += '<input type="hidden" id="inputWaist" value=""><input type="hidden" id="inputHip" value="">';
+  }
+
+  html += '<div class="checkin-field"><label>Streefgewicht (kg)</label><input type="number" step="0.5" id="inputGoal" value="' + weightGoal + '"></div>';
+
+  // How to measure guide (collapsible)
+  html += '<div style="margin-bottom:12px">';
+  html += '<button onclick="toggleMeetAdvies(this)" style="background:none;border:none;color:var(--primary-light);font-size:13px;cursor:pointer;padding:4px 0">Hoe meet ik goed? \u25BC</button>';
+  html += '<div class="meet-advies" style="display:none;font-size:12px;color:var(--text-light);line-height:1.6;margin-top:8px;padding:10px;background:var(--bg);border-radius:8px">';
+  html += '<p style="margin:0 0 8px"><strong>\u2696\uFE0F Wegen:</strong> 1x per week, \'s ochtends, na het plassen, voor het ontbijt. Zonder kleding of in ondergoed. Zelfde weegschaal, zelfde plek.</p>';
+  html += '<p style="margin:0 0 8px"><strong>\uD83D\uDCCF Taille/heup:</strong> 1x per maand. Taille: smalste plek (ter hoogte van navel). Heup: breedste punt. Meetlint horizontaal, niet te strak. Adem rustig uit.</p>';
+  html += '<p style="margin:0"><strong>\uD83D\uDCC6 Wanneer:</strong> Altijd op dezelfde dag en tijdstip. Je gewicht schommelt dagelijks 0,5\u20131,5 kg door vocht en voeding \u2014 dat is normaal.</p>';
+  html += '</div></div>';
+
+  html += '<button class="save-btn" onclick="saveMeasurement()">Meting opslaan</button>';
+  html += '</div></div>';
+
+  // ── SESSION HISTORY ──
+  html += '<div class="card">';
+  html += '<div class="card-header"><span class="icon">\uD83D\uDCDD</span> Trainingsgeschiedenis</div>';
+  html += '<div id="historyList">';
+  if (sessions.length === 0) {
+    html += '<div class="history-empty"><div class="emoji">\uD83D\uDCDD</div><p>Nog geen trainingen.<br>Na je eerste training verschijnt hier je geschiedenis.</p></div>';
+  } else {
     sessions.slice().reverse().forEach(function(s) {
       var d = new Date(s.date);
       var stats = '';
       if (s.exercises) {
         var weights = s.exercises.filter(function(e) { return e.weight > 0; }).map(function(e) { return e.weight; });
         var maxW = weights.length > 0 ? Math.max.apply(null, weights) : 0;
-        if (maxW > 0) stats = 'Zwaarste gewicht: ' + maxW + ' kg';
+        if (maxW > 0) stats = 'Zwaarste: ' + maxW + ' kg';
       }
+      var feedbackStr = '';
+      if (s.feedback) {
+        var energyEmojis = ['', '\uD83D\uDE29', '\uD83D\uDE14', '\uD83D\uDE10', '\uD83D\uDE0A', '\uD83D\uDCAA'];
+        if (s.feedback.energy) feedbackStr += energyEmojis[s.feedback.energy] + ' ';
+        if (s.feedback.calfPain !== null && s.feedback.calfPain !== undefined && s.feedback.calfPain > 0) feedbackStr += '\uD83E\uDDB5' + s.feedback.calfPain + '/3';
+      }
+
       html += '<div class="history-item">';
       html += '<div class="history-date">' + formatDateNL(d) + '</div>';
-      html += '<div class="history-type">' + (s.name || s.type) + '</div>';
+      html += '<div class="history-type">' + (s.name || s.type);
+      if (feedbackStr) html += ' <span style="font-size:12px">' + feedbackStr + '</span>';
+      html += '</div>';
       if (stats) html += '<div class="history-stats">' + stats + '</div>';
+      if (s.feedback && s.feedback.note) html += '<div style="font-size:12px;color:var(--text-light);font-style:italic;margin-top:2px">\u201C' + s.feedback.note + '\u201D</div>';
       html += '</div>';
     });
-    list.innerHTML = html;
+  }
+  html += '</div></div>';
+
+  // ── INSTELLINGEN: WEEK B ──
+  var weekBOn = getStore('weekBEnabled', false);
+  var weekBReady = isWeekBReady();
+  html += '<div class="card">';
+  html += '<div class="card-header"><span class="icon">\u2699\uFE0F</span> Instellingen</div>';
+  html += '<div style="padding:14px 16px">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+  html += '<div><div style="font-weight:600;font-size:14px">Week B inschakelen</div>';
+  html += '<div style="font-size:12px;color:var(--text-light)">Voegt vrijdag lichte cardio toe (om de week)</div></div>';
+  html += '<label class="toggle-switch"><input type="checkbox" ' + (weekBOn ? 'checked' : '') + ' onchange="toggleWeekB()"><span class="toggle-slider"></span></label>';
+  html += '</div>';
+  if (!weekBOn && weekBReady) {
+    html += '<div style="font-size:12px;color:var(--success);margin-top:4px">\u2705 Je kuitpijn is de laatste weken laag \u2014 je kunt Week B proberen!</div>';
+  }
+  if (!weekBOn && !weekBReady) {
+    html += '<div style="font-size:12px;color:var(--text-light);margin-top:4px">Week B wordt aanbevolen als je kuitpijn consequent onder controle is (gemiddeld &lt; 2/3).</div>';
+  }
+  // Dark mode toggle
+  var darkOn = getStore('darkMode', false);
+  html += '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between">';
+  html += '<div><div style="font-weight:600;font-size:14px">Donkere modus</div>';
+  html += '<div style="font-size:12px;color:var(--text-light)">Makkelijker voor je ogen in het donker</div></div>';
+  html += '<label class="toggle-switch"><input type="checkbox" ' + (darkOn ? 'checked' : '') + ' onchange="toggleDarkMode()"><span class="toggle-slider"></span></label>';
+  html += '</div></div>';
+
+  // Reminders toggle
+  var remindersOn = getStore('remindersEnabled', false);
+  html += '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between">';
+  html += '<div><div style="font-weight:600;font-size:14px">Herinneringen</div>';
+  html += '<div style="font-size:12px;color:var(--text-light)">Krijg een melding op trainingsdagen</div></div>';
+  html += '<label class="toggle-switch"><input type="checkbox" ' + (remindersOn ? 'checked' : '') + ' onchange="toggleReminders()"><span class="toggle-slider"></span></label>';
+  html += '</div>';
+  if (remindersOn && 'Notification' in window && Notification.permission === 'denied') {
+    html += '<div style="font-size:12px;color:var(--warning);margin-top:4px">Meldingen zijn geblokkeerd in je browser. Sta ze toe in je instellingen.</div>';
+  }
+  html += '</div>';
+
+  // Phase info
+  var phase = getCurrentPhase();
+  var phaseInfo = PHASE_CONFIG[phase];
+  var progress = isPhase2Available();
+  html += '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">';
+  html += '<div><div style="font-weight:600;font-size:14px">' + phaseInfo.name + '</div>';
+  html += '<div style="font-size:12px;color:var(--text-light)">' + phaseInfo.description + '</div></div>';
+  html += '</div>';
+  if (phase === 1) {
+    var req = PHASE_CONFIG[2].unlockRequirement;
+    html += '<div style="font-size:12px;color:var(--text-light);margin-top:6px">';
+    html += 'Fase 2 unlock: ' + progress.sessions + '/' + req.sessions + ' sessies, ' + progress.weeks + '/' + req.weeks + ' weken actief';
+    html += '</div>';
+    var pctS = Math.min(100, Math.round(progress.sessions / req.sessions * 100));
+    var pctW = Math.min(100, Math.round(progress.weeks / req.weeks * 100));
+    var pct = Math.min(pctS, pctW);
+    html += '<div style="background:var(--border);border-radius:6px;height:6px;margin-top:6px;overflow:hidden">';
+    html += '<div style="background:var(--accent);height:100%;width:' + pct + '%;border-radius:6px;transition:width 0.3s"></div>';
+    html += '</div>';
+  } else {
+    html += '<div style="font-size:12px;color:var(--success);margin-top:4px">\u2705 Fase 2 is ontgrendeld! Meer oefeningen en variatie beschikbaar.</div>';
+  }
+  html += '</div>';
+  html += '</div></div>';
+
+  // ── CLOUD SYNC STATUS ──
+  html += '<div class="card">';
+  html += '<div class="card-header"><span class="icon">☁️</span> Cloud backup</div>';
+  html += '<div style="padding:12px 16px">';
+  if (typeof getCloudSyncStatus === 'function') {
+    var syncStatus = getCloudSyncStatus();
+    if (syncStatus.enabled) {
+      var lastSync = syncStatus.lastSync ? new Date(syncStatus.lastSync).toLocaleString('nl-NL') : 'nog niet';
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+      html += '<span style="color:var(--success);font-size:18px">●</span>';
+      html += '<span style="font-size:14px;font-weight:600;color:var(--success)">Actief</span>';
+      html += '</div>';
+      html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:8px">Je data wordt automatisch opgeslagen in de cloud. Telefoon kwijt of browser gewist? Geen probleem — alles wordt hersteld.</p>';
+      html += '<p style="font-size:12px;color:var(--text-light)">Laatste sync: ' + lastSync + '</p>';
+      html += '<button class="save-btn" onclick="fullSyncToCloud()" style="margin-top:8px;font-size:13px">🔄 Nu synchroniseren</button>';
+    } else {
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+      html += '<span style="color:var(--warning);font-size:18px">●</span>';
+      html += '<span style="font-size:14px;font-weight:600;color:var(--warning)">Niet actief</span>';
+      html += '</div>';
+      html += '<p style="font-size:13px;color:var(--text-light)">Cloud backup is nog niet ingesteld. Je data staat alleen lokaal op dit apparaat.</p>';
+    }
+  } else {
+    html += '<p style="font-size:13px;color:var(--text-light)">Cloud sync module niet geladen.</p>';
+  }
+  html += '</div></div>';
+
+  // ── EXPORT / IMPORT ──
+  html += '<div class="card">';
+  html += '<div class="card-header"><span class="icon">\uD83D\uDCBE</span> Data beheer</div>';
+  html += '<div style="padding:12px 16px">';
+  html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:12px">Exporteer al je trainingsdata als JSON-bestand. Handig als extra back-up of om naar een ander apparaat te verplaatsen.</p>';
+  html += '<div style="display:flex;gap:10px;flex-wrap:wrap">';
+  html += '<button class="save-btn" onclick="exportData()" style="flex:1;min-width:120px">\u2B07 Exporteren</button>';
+  html += '<button class="save-btn" onclick="triggerImport()" style="flex:1;min-width:120px;background:var(--text-light)">\u2B06 Importeren</button>';
+  html += '</div>';
+  html += '<input type="file" id="importFileInput" accept=".json" style="display:none" onchange="importData(this)">';
+  html += '</div></div>';
+
+  // ── OFFLINE VIDEO'S ──
+  html += '<div class="card">';
+  html += '<div class="card-header"><span class="icon">\uD83C\uDFA5</span> Offline video\'s</div>';
+  html += '<div style="padding:12px 16px">';
+  html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:12px">Download alle oefenvideo\'s zodat ze ook zonder internet werken.</p>';
+  html += '<div id="videoCacheProgress"></div>';
+  html += '<button class="save-btn" onclick="cacheAllVideos()" id="cacheVideosBtn">\u2B07 Video\'s downloaden</button>';
+  html += '</div></div>';
+
+  container.innerHTML = html;
+}
+
+// ── EXPORT / IMPORT FUNCTIONS ──
+function exportData() {
+  var data = buildExportData();
+  var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'lisanne-training-' + getTodayKey() + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  // Track backup
+  setStore('lastBackupDate', new Date().toISOString());
+  setStore('lastBackupSessionCount', getStore('sessions', []).length);
+}
+
+function triggerImport() {
+  document.getElementById('importFileInput').click();
+}
+
+function importData(input) {
+  if (!input.files || !input.files[0]) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = JSON.parse(e.target.result);
+      if (!data.sessions || !Array.isArray(data.sessions)) {
+        alert('Ongeldig bestand: geen trainingsdata gevonden.');
+        return;
+      }
+
+      if (!confirm('Weet je zeker dat je wilt importeren? Dit vervangt je huidige data (' + getStore('sessions', []).length + ' trainingen).')) {
+        return;
+      }
+
+      setStore('sessions', data.sessions);
+      if (data.measurements) setStore('measurements', data.measurements);
+
+      // Restore all lt_ keys
+      if (data.weights) {
+        Object.keys(data.weights).forEach(function(key) {
+          localStorage.setItem(key, JSON.stringify(data.weights[key]));
+        });
+      }
+
+      renderHistory();
+      alert('Import gelukt! ' + data.sessions.length + ' trainingen geladen.');
+    } catch(err) {
+      alert('Fout bij importeren: ' + err.message);
+    }
+  };
+  reader.readAsText(input.files[0]);
+  input.value = '';
+}
+
+// ── AUTO-BACKUP ──
+function checkAutoBackup() {
+  var sessions = getStore('sessions', []);
+  if (sessions.length === 0) return;
+
+  var lastBackup = getStore('lastBackupDate', '');
+  var now = new Date();
+  var todayKey = getTodayKey();
+
+  // Auto-backup after every 5 sessions since last backup
+  var lastBackupSessionCount = getStore('lastBackupSessionCount', 0);
+  if (sessions.length - lastBackupSessionCount >= 5) {
+    autoSaveBackup();
+    return;
   }
 
-  // Measurements
-  var measurements = getStore('measurements', []);
-  var mList = document.getElementById('measurementsList');
-  if (measurements.length > 0) {
-    var mHtml = '';
-    measurements.slice().reverse().forEach(function(m) {
-      var d = new Date(m.date);
-      mHtml += '<div class="history-item">';
-      mHtml += '<div class="history-date">' + formatDateNL(d) + '</div>';
-      mHtml += '<div class="history-stats">Gewicht: ' + m.weight + ' kg';
-      if (m.waist) mHtml += ' \u00b7 Taille: ' + m.waist + ' cm';
-      mHtml += '</div></div>';
-    });
-    mList.innerHTML = mHtml;
-  } else {
-    mList.innerHTML = '<div style="padding:14px 18px;color:var(--text-light);font-size:13px">Nog geen metingen.</div>';
+  // Remind weekly if no backup in 7 days
+  if (lastBackup) {
+    var daysSinceBackup = Math.floor((now - new Date(lastBackup)) / 86400000);
+    if (daysSinceBackup >= 7) {
+      showBackupReminder();
+    }
+  } else if (sessions.length >= 3) {
+    // First time, suggest backup after 3 sessions
+    showBackupReminder();
   }
+}
+
+function autoSaveBackup() {
+  try {
+    var data = buildExportData();
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'trainingsdata-backup-' + getTodayKey() + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setStore('lastBackupDate', new Date().toISOString());
+    setStore('lastBackupSessionCount', getStore('sessions', []).length);
+  } catch(e) {}
+}
+
+function buildExportData() {
+  var data = {
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    sessions: getStore('sessions', []),
+    measurements: getStore('measurements', []),
+    settings: {}
+  };
+  for (var i = 0; i < localStorage.length; i++) {
+    var key = localStorage.key(i);
+    if (key.startsWith('lt_') && key !== 'lt_sessions' && key !== 'lt_measurements') {
+      try { data.settings[key] = JSON.parse(localStorage.getItem(key)); } catch(e) {}
+    }
+  }
+  return data;
+}
+
+function showBackupReminder() {
+  var existing = document.getElementById('backupReminder');
+  if (existing) return; // Don't show twice
+
+  var div = document.createElement('div');
+  div.id = 'backupReminder';
+  div.className = 'backup-reminder';
+  div.innerHTML = '<span>\uD83D\uDCBE Tijd voor een back-up van je trainingsdata!</span>' +
+    '<div style="display:flex;gap:8px;margin-top:8px">' +
+    '<button class="save-btn" onclick="exportData();dismissBackupReminder()" style="font-size:12px;padding:6px 12px">Nu exporteren</button>' +
+    '<button onclick="dismissBackupReminder()" style="background:none;border:none;color:var(--text-light);font-size:12px;cursor:pointer">Later</button>' +
+    '</div>';
+  var content = document.getElementById('todayContent');
+  if (content && content.firstChild) {
+    content.insertBefore(div, content.firstChild);
+  }
+}
+
+function dismissBackupReminder() {
+  var el = document.getElementById('backupReminder');
+  if (el) el.remove();
+  setStore('lastBackupDate', new Date().toISOString());
+}
+
+// ── DARK MODE ──
+function applyDarkMode() {
+  var dark = getStore('darkMode', false);
+  document.body.setAttribute('data-theme', dark ? 'dark' : 'light');
+  // Update theme-color meta tag
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = dark ? '#16213E' : '#1B4F72';
+}
+
+function toggleDarkMode() {
+  var current = getStore('darkMode', false);
+  setStore('darkMode', !current);
+  applyDarkMode();
+  renderHistory();
+}
+
+// ── HERINNERINGEN / NOTIFICATIES ──
+function setupReminders() {
+  var enabled = getStore('remindersEnabled', false);
+  if (!enabled) return;
+  if (!('Notification' in window)) return;
+
+  if (Notification.permission === 'default') {
+    Notification.requestPermission();
+    return;
+  }
+  if (Notification.permission !== 'granted') return;
+
+  // Check if we already sent a reminder today
+  var todayKey = getTodayKey();
+  var lastReminder = getStore('lastReminderDate', '');
+  if (lastReminder === todayKey) return;
+
+  // Check if today is a training day
+  var dayOfWeek = new Date().getDay();
+  var weekType = getWeekType();
+  var schedule = getSchedule(weekType);
+  var trainingKey = schedule[dayOfWeek] || null;
+
+  if (trainingKey) {
+    var training = TRAINING_DATA[trainingKey];
+    if (training) {
+      // Schedule a notification after a short delay (so it feels like a reminder)
+      setTimeout(function() {
+        try {
+          new Notification('Trainingsschema Lisanne', {
+            body: 'Vandaag: ' + training.name + ' \u2014 Succes! \uD83D\uDCAA',
+            icon: './manifest.json',
+            tag: 'training-reminder'
+          });
+          setStore('lastReminderDate', todayKey);
+        } catch(e) {}
+      }, 2000);
+    }
+  }
+}
+
+function toggleReminders() {
+  var current = getStore('remindersEnabled', false);
+  if (!current && 'Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission().then(function(perm) {
+      if (perm === 'granted') {
+        setStore('remindersEnabled', true);
+        renderHistory();
+      }
+    });
+  } else {
+    setStore('remindersEnabled', !current);
+    renderHistory();
+  }
+}
+
+// ── VIDEO CACHING ──
+function cacheAllVideos() {
+  var urls = [];
+  Object.keys(EXERCISE_DB).forEach(function(key) {
+    var ex = EXERCISE_DB[key];
+    if (ex.videoUrl) urls.push(ex.videoUrl);
+  });
+
+  if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
+    alert('Service worker niet beschikbaar. Herlaad de app en probeer opnieuw.');
+    return;
+  }
+
+  var btn = document.getElementById('cacheVideosBtn');
+  if (btn) { btn.textContent = 'Bezig met downloaden...'; btn.disabled = true; }
+
+  navigator.serviceWorker.controller.postMessage({
+    type: 'CACHE_VIDEOS',
+    urls: urls
+  });
+}
+
+// Listen for video cache progress messages
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', function(event) {
+    if (event.data && event.data.type === 'VIDEO_CACHE_PROGRESS') {
+      var el = document.getElementById('videoCacheProgress');
+      var btn = document.getElementById('cacheVideosBtn');
+      if (el) {
+        var pct = Math.round((event.data.done / event.data.total) * 100);
+        el.innerHTML = '<div style="background:var(--border);border-radius:6px;height:6px;margin-bottom:8px;overflow:hidden">' +
+          '<div style="background:var(--success);height:100%;width:' + pct + '%;border-radius:6px;transition:width 0.3s"></div></div>' +
+          '<div style="font-size:12px;color:var(--text-light)">' + event.data.done + ' / ' + event.data.total + ' video\'s</div>';
+      }
+      if (event.data.done >= event.data.total && btn) {
+        btn.textContent = '\u2705 Alle video\'s opgeslagen!';
+        btn.disabled = false;
+      }
+    }
+  });
+}
+
+// ── PROGRESS HELPER FUNCTIONS ──
+function calcStreak(sessions) {
+  if (sessions.length === 0) return 0;
+  // Count consecutive weeks that have at least 1 session
+  var now = new Date();
+  var streak = 0;
+  for (var w = 0; w < 52; w++) {
+    var weekStart = new Date(now);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay() - (w * 7));
+    weekStart.setHours(0,0,0,0);
+    var weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    var hasSession = sessions.some(function(s) {
+      var d = new Date(s.date);
+      return d >= weekStart && d < weekEnd;
+    });
+    if (hasSession) {
+      streak++;
+    } else if (w > 0) {
+      break;
+    }
+  }
+  return streak;
+}
+
+function countThisWeek(sessions) {
+  var now = new Date();
+  var monday = new Date(now);
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  monday.setHours(0,0,0,0);
+  return sessions.filter(function(s) { return new Date(s.date) >= monday; }).length;
+}
+
+function calcAvgEnergy(sessions) {
+  var energySessions = sessions.filter(function(s) { return s.feedback && s.feedback.energy; });
+  if (energySessions.length === 0) return 0;
+  var sum = energySessions.reduce(function(t, s) { return t + s.feedback.energy; }, 0);
+  return sum / energySessions.length;
+}
+
+function buildExerciseHistory(sessions) {
+  var history = {};
+  sessions.forEach(function(s) {
+    if (!s.exercises) return;
+    s.exercises.forEach(function(ex) {
+      if (ex.weight <= 0) return;
+      if (!history[ex.id]) history[ex.id] = [];
+      history[ex.id].push({ date: s.date, weight: ex.weight, reps: ex.reps || 0 });
+    });
+  });
+  return history;
 }
 
 function saveMeasurement() {
   var weight = parseFloat(document.getElementById('inputWeight').value);
   var waist = parseFloat(document.getElementById('inputWaist').value) || null;
-  if (!weight) return;
+  var hip = parseFloat(document.getElementById('inputHip').value) || null;
+  var goal = parseFloat(document.getElementById('inputGoal').value) || null;
+  if (!weight || weight < 30 || weight > 300) return;
+
+  if (goal && goal > 0) setStore('weightGoal', goal);
 
   var measurements = getStore('measurements', []);
-  measurements.push({ date: getTodayKey(), weight: weight, waist: waist });
+  measurements.push({ date: getTodayKey(), weight: weight, waist: waist, hip: hip });
   setStore('measurements', measurements);
 
   document.getElementById('inputWeight').value = '';
   document.getElementById('inputWaist').value = '';
+  document.getElementById('inputHip').value = '';
   renderHistory();
+}
+
+function getWeightMessage(measurements, goal) {
+  if (measurements.length < 2) {
+    return '<div style="font-size:13px;color:var(--text-light);text-align:center;padding:4px 0">Na je volgende weging kan ik je voortgang laten zien.</div>';
+  }
+
+  var latest = measurements[measurements.length - 1].weight;
+  var prev = measurements[measurements.length - 2].weight;
+  var first = measurements[0].weight;
+  var diff = latest - prev;
+  var totalDiff = latest - first;
+
+  // Check for plateau (last 3+ measurements roughly the same)
+  var isPlat = false;
+  if (measurements.length >= 3) {
+    var last3 = measurements.slice(-3).map(function(m) { return m.weight; });
+    var range = Math.max.apply(null, last3) - Math.min.apply(null, last3);
+    isPlat = range < 0.5;
+  }
+
+  var msg = '';
+  if (latest <= goal) {
+    // Goal reached!
+    msg = '<div style="font-size:14px;color:var(--success);text-align:center;font-weight:600;padding:4px 0">\uD83C\uDF89 Je hebt je streefgewicht bereikt! Wat een prestatie!</div>';
+  } else if (diff < -0.3) {
+    // Losing weight
+    msg = '<div style="font-size:13px;color:var(--success);text-align:center;padding:4px 0">\u2B07\uFE0F Je bent op de goede weg! ' + Math.abs(diff).toFixed(1) + ' kg eraf sinds vorige meting.</div>';
+  } else if (diff > 0.5) {
+    // Gaining weight
+    msg = '<div style="font-size:13px;color:var(--text-light);text-align:center;padding:4px 0;line-height:1.5">';
+    msg += 'Je gewicht is iets gestegen. Dat kan normaal zijn \u2014 door spiermassa, vochtbalans, of gewoon een zwaardere maaltijd. ';
+    msg += 'Kijk naar de trend over weken, niet naar \u00e9\u00e9n meting. Blijf lekker bezig!</div>';
+  } else if (isPlat) {
+    // Plateau
+    msg = '<div style="font-size:13px;color:var(--text-light);text-align:center;padding:4px 0;line-height:1.5">';
+    msg += 'Je gewicht is stabiel. Plateaus zijn normaal en horen bij het proces \u2014 je lichaam past zich aan. ';
+    msg += 'Als je blijft trainen en gezond eet, gaat het vanzelf weer bewegen. Vertrouw het proces!</div>';
+  } else {
+    // Stable / minor change
+    msg = '<div style="font-size:13px;color:var(--text-light);text-align:center;padding:4px 0">Stabiel \u2014 goed bezig! Consistentie is het belangrijkste.</div>';
+  }
+
+  // If overall trend is good, add encouragement
+  if (totalDiff < -1 && latest > goal) {
+    msg += '<div style="font-size:12px;color:var(--success);text-align:center;margin-top:4px">In totaal al ' + Math.abs(totalDiff).toFixed(1) + ' kg kwijt \uD83D\uDCAA</div>';
+  }
+
+  return msg;
 }
 
 // ================================================================
@@ -934,7 +2789,7 @@ function renderAgenda() {
       var isDone = !!sessionDates[dayKey];
 
       var trainingKey = schedule[dayOfWeek];
-      var isCycling = [1,2,4].includes(dayOfWeek);
+      var isCycling = !trainingKey && [1,4].includes(dayOfWeek);
 
       var dotClass = 'agenda-dot-rust';
       var title = 'Rustdag';
@@ -945,7 +2800,7 @@ function renderAgenda() {
         title = training.name;
         if (training.type === 'kracht') {
           dotClass = 'agenda-dot-kracht';
-          subtitle = '3 rondes \u00b7 \u00b145 min';
+          subtitle = '3 sets per oefening \u00b7 \u00b145 min';
         } else {
           dotClass = 'agenda-dot-cardio';
           var minTotal = training.options ? training.options[0].totalMin || 45 : 45;
@@ -1022,15 +2877,16 @@ function renderKrachtPreview(container, training, trainingKey) {
   var html = '<div class="card">';
   html += '<div class="card-header"><span class="icon">\uD83C\uDFCB</span><div>';
   html += '<div style="font-size:20px;font-weight:700;color:var(--primary)">' + training.name + '</div>';
-  html += '<div style="font-size:13px;color:var(--text-light)">3 rondes \u00b7 \u00b145 min</div>';
+  html += '<div style="font-size:13px;color:var(--text-light)">3 sets per oefening \u00b7 \u00b145 min</div>';
   html += '</div></div>';
 
   // Warmup
   html += '<div class="phase-block"><div class="phase-icon">\uD83D\uDD25</div>';
   html += '<div class="phase-text"><strong>Warming-up:</strong> ' + training.warmup.apparaat + ' ' + training.warmup.duur + ' \u2014 ' + training.warmup.detail + '</div></div>';
 
-  // Exercise list
-  training.exerciseIds.forEach(function(exId) {
+  // Exercise list (phase-aware)
+  var previewExercises = getTrainingExercises(trainingKey);
+  previewExercises.forEach(function(exId) {
     var ex = getExercise(exId);
     if (!ex) return;
     var prevWeight = getLastWeight(exId);
@@ -1132,6 +2988,9 @@ function showPage(pageId, btn) {
   document.querySelectorAll('.nav-item').forEach(function(b) { b.classList.remove('active'); });
   btn.classList.add('active');
 
+  // Scroll to top on page switch
+  window.scrollTo(0, 0);
+
   if (pageId === 'pageHistory') renderHistory();
   if (pageId === 'pageAgenda') renderAgenda();
   if (pageId === 'pageTrain') renderToday();
@@ -1142,6 +3001,127 @@ function closeBanner() {
 }
 
 // ================================================================
+// ONBOARDING
+// ================================================================
+var onboardingStep = 0;
+
+function showOnboarding() {
+  var overlay = document.createElement('div');
+  overlay.id = 'onboardingOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px';
+  document.body.appendChild(overlay);
+  onboardingStep = 0;
+  renderOnboardingStep();
+}
+
+function renderOnboardingStep() {
+  var overlay = document.getElementById('onboardingOverlay');
+  if (!overlay) return;
+
+  var steps = [
+    {
+      emoji: '\uD83C\uDFCB\uFE0F\u200D\u2640\uFE0F',
+      title: 'Welkom Lisanne!',
+      text: 'Dit is jouw persoonlijke trainingsapp. Speciaal voor jou gemaakt, met een schema dat past bij jouw niveau en doelen.',
+      sub: 'Geen ingewikkelde menu\u2019s \u2014 open de app, en je ziet meteen wat je vandaag kunt doen.',
+      btn: 'Volgende'
+    },
+    {
+      emoji: '\uD83D\uDCC5',
+      title: 'Hoe werkt het?',
+      text: 'Elke dag zie je wat er op het programma staat. Krachttraining met uitleg en video\u2019s, cardio, of een rustdag met stretches.',
+      sub: 'Na elke training geef je kort aan hoe het ging. Zo houd je je voortgang bij en kan het schema zich aanpassen.',
+      btn: 'Volgende'
+    },
+    {
+      emoji: '\uD83C\uDFAF',
+      title: 'Laten we beginnen!',
+      text: 'Vul hieronder je startgewicht en streefgewicht in. Je kunt dit later altijd aanpassen.',
+      form: true,
+      btn: 'Start!'
+    }
+  ];
+
+  var s = steps[onboardingStep];
+  var dots = '';
+  for (var i = 0; i < steps.length; i++) {
+    dots += '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 4px;background:' + (i === onboardingStep ? 'var(--primary)' : 'var(--border)') + '"></span>';
+  }
+
+  var html = '<div style="max-width:360px;text-align:center">';
+  html += '<div style="font-size:64px;margin-bottom:16px">' + s.emoji + '</div>';
+  html += '<h2 style="font-size:24px;font-weight:700;color:var(--text);margin:0 0 12px">' + s.title + '</h2>';
+  html += '<p style="font-size:15px;color:var(--text);line-height:1.6;margin:0 0 8px">' + s.text + '</p>';
+
+  if (s.sub) {
+    html += '<p style="font-size:13px;color:var(--text-light);line-height:1.5;margin:0 0 20px">' + s.sub + '</p>';
+  }
+
+  if (s.form) {
+    html += '<div style="text-align:left;margin:16px 0 20px">';
+    html += '<div style="margin-bottom:12px"><label style="font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:4px">Huidig gewicht (kg)</label>';
+    html += '<input type="number" step="0.1" id="onboardWeight" placeholder="bv. 75" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;font-size:16px;background:var(--card);color:var(--text);box-sizing:border-box"></div>';
+    html += '<div><label style="font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:4px">Streefgewicht (kg)</label>';
+    html += '<input type="number" step="0.5" id="onboardGoal" value="70" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;font-size:16px;background:var(--card);color:var(--text);box-sizing:border-box"></div>';
+    html += '</div>';
+  }
+
+  html += '<div style="margin:8px 0 20px">' + dots + '</div>';
+  html += '<button onclick="nextOnboardingStep()" style="width:100%;padding:14px;background:var(--primary);color:white;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer">' + s.btn + '</button>';
+
+  if (onboardingStep > 0) {
+    html += '<button onclick="prevOnboardingStep()" style="width:100%;padding:10px;background:none;color:var(--text-light);border:none;font-size:14px;cursor:pointer;margin-top:8px">Terug</button>';
+  }
+
+  html += '</div>';
+  overlay.innerHTML = html;
+}
+
+function nextOnboardingStep() {
+  if (onboardingStep === 2) {
+    // Save initial measurement if provided
+    var weightEl = document.getElementById('onboardWeight');
+    var goalEl = document.getElementById('onboardGoal');
+    var weight = weightEl ? parseFloat(weightEl.value) : 0;
+    var goal = goalEl ? parseFloat(goalEl.value) : 70;
+
+    if (weight && weight >= 30 && weight <= 300) {
+      var measurements = getStore('measurements', []);
+      measurements.push({ date: getTodayKey(), weight: weight, waist: null, hip: null });
+      setStore('measurements', measurements);
+    }
+    if (goal && goal > 0) {
+      setStore('weightGoal', goal);
+    }
+
+    // Mark onboarding as done
+    setStore('onboardingDone', true);
+
+    // Remove overlay and start app
+    var overlay = document.getElementById('onboardingOverlay');
+    if (overlay) overlay.remove();
+    renderToday();
+    return;
+  }
+  onboardingStep++;
+  renderOnboardingStep();
+}
+
+function prevOnboardingStep() {
+  if (onboardingStep > 0) {
+    onboardingStep--;
+    renderOnboardingStep();
+  }
+}
+
+// ================================================================
 // INIT
 // ================================================================
-renderToday();
+applyDarkMode();
+if (!getStore('onboardingDone', false)) {
+  showOnboarding();
+} else {
+  renderToday();
+}
+setupReminders();
+setTimeout(checkAutoBackup, 3000); // Check after app loaded

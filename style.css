@@ -11,7 +11,44 @@
   --text-light: #888888;
   --border: #E8ECF0;
   --shadow: 0 2px 8px rgba(0,0,0,0.08);
+  --warning: #F39C12;
 }
+
+/* Dark mode overrides */
+[data-theme="dark"] {
+  --primary: #2E75B6;
+  --primary-light: #4A9FE5;
+  --primary-dark: #1B4F72;
+  --accent: #F5B041;
+  --bg: #1A1A2E;
+  --card: #222240;
+  --text: #E8E8E8;
+  --text-light: #999AAD;
+  --border: #33334A;
+  --shadow: 0 2px 8px rgba(0,0,0,0.3);
+  --warning: #F5B041;
+}
+[data-theme="dark"] .topbar { background: #16213E; }
+[data-theme="dark"] .bottom-nav { background: #16213E; border-top-color: #33334A; }
+[data-theme="dark"] .nav-item { color: #999AAD; }
+[data-theme="dark"] .nav-item.active { color: #F5B041; }
+[data-theme="dark"] .tm-header { background: #16213E; }
+[data-theme="dark"] .training-mode { background: var(--bg); }
+[data-theme="dark"] .motivation-strip { background: linear-gradient(135deg, #16213E, #0F3460); }
+[data-theme="dark"] input, [data-theme="dark"] textarea { background: #2A2A45; color: #E8E8E8; border-color: #33334A; }
+[data-theme="dark"] .modal-sheet { background: var(--card); color: var(--text); }
+[data-theme="dark"] .modal-option { border-color: var(--border); }
+[data-theme="dark"] .modal-option:active { background: rgba(46,117,182,0.15); border-color: var(--primary-light); }
+[data-theme="dark"] .modal-option.recommended { background: rgba(39,174,96,0.1); }
+[data-theme="dark"] .vrije-training-btn { background: var(--card); border-color: var(--primary-light); color: var(--primary-light); }
+[data-theme="dark"] .recovery-warning { background: #2A2A20; color: #E0C060; border-left-color: var(--accent); }
+[data-theme="dark"] .ex-tip { background: #2A2A20; color: #E0C060; }
+[data-theme="dark"] .exercise-item.done { background: rgba(39,174,96,0.08); }
+[data-theme="dark"] .phase-block { background: var(--card); }
+[data-theme="dark"] .instruction-panel { background: var(--card); }
+[data-theme="dark"] .completion-stats { background: var(--card); }
+[data-theme="dark"] .tm-btn-outline { background: var(--card); color: var(--primary-light); border-color: var(--border); }
+[data-theme="dark"] .bottom-nav { background: #16213E; }
 
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
@@ -85,7 +122,7 @@ body {
   width: calc(100% - 32px);
   margin: 16px auto;
   padding: 16px;
-  background: white;
+  background: var(--card);
   border: 2px dashed var(--primary-light);
   border-radius: 14px;
   font-size: 15px;
@@ -94,6 +131,7 @@ body {
   cursor: pointer;
   text-align: center;
 }
+.vrije-training-btn:active { background: var(--border); transform: scale(0.98); }
 
 /* ================================================================
    EXERCISE ITEMS (overview mode)
@@ -182,10 +220,10 @@ body {
 }
 .exercise-video {
   width: 100%;
-  max-width: 280px;
+  max-width: 320px;
   border-radius: 10px;
   margin-bottom: 10px;
-  background: #000;
+  background: transparent;
 }
 .exercise-video-container {
   text-align: center;
@@ -590,7 +628,10 @@ body {
 .modal-option:active { background: #EBF5FB; border-color: var(--primary-light); }
 .modal-option .opt-title { font-weight: 600; font-size: 15px; }
 .modal-option .opt-desc { font-size: 13px; color: var(--text-light); margin-top: 4px; }
-.modal-option.warning { border-color: var(--accent); }
+.modal-option.recommended { border-color: var(--success); border-width: 2px; background: rgba(39,174,96,0.04); }
+.modal-option.recommended:active { background: rgba(39,174,96,0.1); border-color: var(--success); }
+.modal-option.warning { border-color: var(--border); opacity: 0.6; }
+.modal-option.warning:active { opacity: 0.8; }
 .modal-option .opt-warn { font-size: 12px; color: var(--accent); margin-top: 6px; }
 
 /* ================================================================
@@ -629,6 +670,7 @@ body {
   font-weight: 600;
   cursor: pointer;
 }
+.save-btn:active { transform: scale(0.98); opacity: 0.9; }
 
 /* ================================================================
    WELCOME / HINTS
@@ -646,6 +688,17 @@ body {
 .welcome-banner .close-btn {
   margin-left: auto; background: none; border: none; color: white;
   font-size: 20px; cursor: pointer;
+}
+
+.recovery-warning {
+  background: #FEF9E7;
+  border-left: 4px solid var(--accent);
+  padding: 14px 16px;
+  margin: 12px 16px;
+  border-radius: 0 12px 12px 0;
+  font-size: 14px;
+  color: #7D6608;
+  line-height: 1.5;
 }
 
 .ease-back-hint {
@@ -844,4 +897,111 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
+}
+
+/* ================================================================
+   PROGRESS / STATS PAGE
+   ================================================================ */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 12px 16px 16px;
+}
+.stat-box {
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+}
+.stat-num {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.stat-label {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+.progress-exercise {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.progress-exercise:last-child {
+  border-bottom: none;
+}
+.mini-chart {
+  margin-top: 4px;
+}
+
+/* Kuit tips card */
+.kuit-tips-card {
+  margin: 12px 16px;
+}
+
+/* Toggle switch */
+.toggle-switch { position: relative; display: inline-block; width: 48px; height: 26px; flex-shrink: 0; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; cursor: pointer; inset: 0;
+  background: var(--border); border-radius: 26px; transition: 0.3s;
+}
+.toggle-slider::before {
+  content: ''; position: absolute; height: 20px; width: 20px;
+  left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s;
+}
+.toggle-switch input:checked + .toggle-slider { background: var(--success); }
+.toggle-switch input:checked + .toggle-slider::before { transform: translateX(22px); }
+
+/* Warmup/Cooldown screens */
+.tm-warmup-cooldown {
+  text-align: center; padding: 32px 16px;
+}
+.tm-phase-icon {
+  font-size: 48px; margin-bottom: 12px;
+}
+.tm-timer.warmup { color: var(--warning); }
+.tm-timer.cooldown { color: var(--accent); }
+.tm-timer.plank-active { color: var(--success); animation: plank-pulse 1s ease-in-out infinite; }
+@keyframes plank-pulse { 0%,100% { opacity:1; } 50% { opacity:0.7; } }
+
+/* Primary cardio start button */
+.start-btn-primary {
+  display: block; width: calc(100% - 32px); margin: 0 16px 12px;
+  padding: 14px 20px; border: none; border-radius: 12px;
+  background: var(--primary); color: white;
+  font-size: 16px; font-weight: 600; cursor: pointer;
+  text-align: center; transition: background 0.2s;
+}
+.start-btn-primary:active { background: var(--primary-dark); }
+
+/* Subtle secondary cardio options */
+.other-cardio-item {
+  padding: 10px 16px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; color: var(--text-light); font-size: 14px;
+}
+.other-cardio-item:active { background: var(--border); }
+.other-cardio-item .oc-name { font-weight: 500; color: var(--text); }
+.other-cardio-item .oc-detail { font-size: 12px; color: var(--text-light); }
+
+/* Backup reminder */
+.backup-reminder {
+  background: var(--card); border-left: 4px solid var(--accent);
+  padding: 12px 16px; margin: 0 16px 12px; border-radius: 8px;
+  font-size: 13px; box-shadow: var(--shadow);
+}
+
+/* Motivation strip */
+.motivation-strip {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: white; padding: 10px 16px; border-radius: 12px;
+  margin: 12px 16px; font-size: 13px; font-weight: 600;
+  text-align: center; letter-spacing: 0.3px;
+}
+
+/* Prevent iOS zoom on input focus */
+input[type="number"], input[type="text"], textarea, select {
+  font-size: 16px !important;
 }
