@@ -2136,7 +2136,8 @@ function renderHistory() {
     if (latestM.hip) extras.push('Heup: ' + latestM.hip + ' cm');
     if (latestM.waist && latestM.hip) {
       var ratio = (latestM.waist / latestM.hip).toFixed(2);
-      extras.push('T/H ratio: ' + ratio);
+      var ratioLabel = parseFloat(ratio) <= 0.80 ? ' ✓ gezond' : parseFloat(ratio) <= 0.85 ? ' — verhoogd' : ' — te hoog';
+      extras.push('T/H ratio: ' + ratio + ratioLabel);
     }
     if (extras.length > 0) {
       html += '<div style="font-size:12px;padding:0 16px 12px;color:var(--text-light)">' + extras.join(' \u00b7 ') + '</div>';
@@ -2193,8 +2194,8 @@ function renderHistory() {
 
   // Taille/heup fields: always present but collapsed when not due
   if (showBodyFields) {
-    html += '<div class="checkin-field"><label>Tailleomtrek (cm)</label><input type="number" step="0.5" id="inputWaist" placeholder="bv. 82"></div>';
-    html += '<div class="checkin-field"><label>Heupomtrek (cm) \u2014 optioneel</label><input type="number" step="0.5" id="inputHip" placeholder="bv. 100"></div>';
+    html += '<div class="checkin-field"><label>Tailleomtrek (cm) <span style="font-weight:400;font-size:11px;color:var(--text-light)">— smalste punt, ter hoogte van navel</span></label><input type="number" step="0.5" id="inputWaist" placeholder="bv. 82"></div>';
+    html += '<div class="checkin-field"><label>Heupomtrek (cm) <span style="font-weight:400;font-size:11px;color:var(--text-light)">— breedste punt van je heupen</span></label><input type="number" step="0.5" id="inputHip" placeholder="bv. 100"></div>';
   } else {
     html += '<input type="hidden" id="inputWaist" value=""><input type="hidden" id="inputHip" value="">';
   }
