@@ -1453,12 +1453,12 @@ function renderRestDay(container, dayOfWeek, motivHtml) {
   html += '<h2 style="margin:0 0 4px;font-size:18px">' + (isCycling ? 'Fietsdag' : 'Rustdag') + '</h2>';
   if (isCycling) {
     html += '<p style="margin:0 0 8px;font-size:13px">Vandaag fiets je naar school en terug \u2014 dat is al \u00b130 min cardio.</p>';
-    html += '<div style="padding:8px 12px;background:rgba(39,174,96,0.06);border-radius:8px;font-size:12px;color:var(--text);line-height:1.4">';
+    html += '<div style="text-align:left;padding:8px 12px;background:rgba(39,174,96,0.06);border-radius:8px;font-size:12px;color:var(--text);line-height:1.4">';
     html += '\uD83D\uDEB6 <strong>Beweegadvies:</strong> Probeer ook 20\u201330 min te wandelen (\u00b12.000\u20133.000 stappen). Bijv. een rondje met Milou.';
     html += '</div>';
   } else {
     html += '<p style="margin:0 0 8px;font-size:13px">Licht bewegen of stretchen helpt je lichaam sneller herstellen.</p>';
-    html += '<div style="padding:8px 12px;background:rgba(39,174,96,0.06);border-radius:8px;font-size:12px;color:var(--text);line-height:1.4">';
+    html += '<div style="text-align:left;padding:8px 12px;background:rgba(39,174,96,0.06);border-radius:8px;font-size:12px;color:var(--text);line-height:1.4">';
     html += '\uD83D\uDEB6 <strong>Beweegadvies:</strong> Probeer 30\u201345 min te wandelen (\u00b13.000\u20134.500 stappen). Goed voor herstel en vetverbranding.';
     html += '</div>';
   }
@@ -1499,7 +1499,7 @@ function renderRestDay(container, dayOfWeek, motivHtml) {
     html += '</div>';
     html += '<div id="stretchDetail_' + s.id + '" style="display:none;padding:4px 12px 8px 36px">';
     if (s.videoUrl) {
-      html += '<div style="text-align:center;margin-bottom:4px"><video class="exercise-video" src="' + s.videoUrl + '" autoplay loop muted playsinline style="max-width:200px;border-radius:8px" onerror="this.parentElement.style.display=\'none\'"></video></div>';
+      html += '<div style="margin-bottom:4px"><video class="exercise-video" src="' + s.videoUrl + '" autoplay loop muted playsinline onerror="this.parentElement.style.display=\'none\'"></video></div>';
     }
     html += '<p style="font-size:12px;color:var(--text-light);line-height:1.4;margin:0">' + s.instruction + '</p>';
     html += '</div>';
@@ -1801,7 +1801,7 @@ function runStretchStep() {
   html += '<div style="font-size:13px;color:var(--success);margin-bottom:12px">\u2714\uFE0F ' + s.focus + '</div>';
 
   if (s.videoUrl) {
-    html += '<div style="margin:0 0 12px"><video src="' + s.videoUrl + '" autoplay loop muted playsinline style="width:100%;max-width:280px;border-radius:12px" onerror="this.parentElement.style.display=\'none\'"></video></div>';
+    html += '<div style="margin:0 0 12px"><video class="exercise-video" src="' + s.videoUrl + '" autoplay loop muted playsinline onerror="this.parentElement.style.display=\'none\'"></video></div>';
   }
 
   html += '<div class="tm-timer" id="stretchTimerDisplay" style="font-size:56px">' + s.duur + '</div>';
@@ -1966,9 +1966,29 @@ function closeModal() {
   document.getElementById('vrijModal').classList.remove('show');
 }
 
+
 // ================================================================
-// HISTORY
+// HISTORY — Professional Chart.js Dashboard
 // ================================================================
+var _chartInstances = [];
+
+function destroyCharts() {
+  _chartInstances.forEach(function(chart) {
+    if (chart && typeof chart.destroy === 'function') {
+      chart.destroy();
+    }
+  });
+  _chartInstances = [];
+}
+
+function getISOWeek(date) {
+  var d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  var dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
 function renderHistory() {
   var sessions = getStore('sessions', []);
   var measurements = getStore('measurements', []);
@@ -1980,30 +2000,42 @@ function renderHistory() {
   html += '<div class="card">';
   html += '<div class="card-header"><span class="icon">\uD83D\uDCC8</span> Overzicht</div>';
   html += '<div class="stats-grid">';
-
-  // Total sessions
   html += '<div class="stat-box"><div class="stat-num">' + sessions.length + '</div><div class="stat-label">Trainingen</div></div>';
-
-  // Current streak
   var streak = calcStreak(sessions);
   html += '<div class="stat-box"><div class="stat-num">' + streak + '</div><div class="stat-label">Weken op rij</div></div>';
-
-  // This week count
   var thisWeekCount = countThisWeek(sessions);
   html += '<div class="stat-box"><div class="stat-num">' + thisWeekCount + '</div><div class="stat-label">Deze week</div></div>';
-
-  // Average energy
   var avgEnergy = calcAvgEnergy(sessions);
   html += '<div class="stat-box"><div class="stat-num">' + (avgEnergy > 0 ? avgEnergy.toFixed(1) : '-') + '</div><div class="stat-label">Gem. energie</div></div>';
-
   html += '</div></div>';
 
-  // ── WEIGHT PROGRESSION PER EXERCISE ──
+  // ── WEIGHT TREND CHART ──
+  if (measurements.length >= 2) {
+    html += '<div class="card">';
+    html += '<div class="card-header"><span class="icon">\uD83D\uDCC9</span> Gewichtstrend</div>';
+    html += '<div class="chart-container"><canvas id="weightTrendChart"></canvas></div>';
+    html += '</div>';
+  }
+
+  // ── TRAINING FREQUENCY CHART ──
+  if (sessions.length >= 3) {
+    html += '<div class="card">';
+    html += '<div class="card-header"><span class="icon">\uD83D\uDCC5</span> Trainingsfrequentie per week</div>';
+    html += '<div class="chart-container"><canvas id="frequencyChart"></canvas></div>';
+    html += '</div>';
+  }
+
+  // ── STRENGTH PROGRESSION CHART ──
   var exerciseHistory = buildExerciseHistory(sessions);
-  var exerciseKeys = Object.keys(exerciseHistory);
+  var exerciseKeys = Object.keys(exerciseHistory).filter(function(exId) {
+    return exerciseHistory[exId].length >= 2;
+  });
   if (exerciseKeys.length > 0) {
     html += '<div class="card">';
-    html += '<div class="card-header"><span class="icon">\uD83C\uDFCB</span> Gewichtsprogressie</div>';
+    html += '<div class="card-header"><span class="icon">\uD83D\uDCAA</span> Krachtprogressie</div>';
+
+    // Summary table per exercise
+    html += '<div style="padding:0 16px 8px">';
     exerciseKeys.forEach(function(exId) {
       var ex = getExercise(exId);
       if (!ex) return;
@@ -2014,44 +2046,25 @@ function renderHistory() {
       var diff = latest.weight - first.weight;
       var diffStr = diff > 0 ? '+' + diff + ' kg' : (diff < 0 ? diff + ' kg' : 'gelijk');
       var diffColor = diff > 0 ? 'var(--success)' : (diff < 0 ? '#E74C3C' : 'var(--text-light)');
-
-      html += '<div class="progress-exercise">';
-      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
-      html += '<span style="font-weight:600;font-size:14px">' + ex.name + '</span>';
-      html += '<span style="font-size:13px;color:' + diffColor + ';font-weight:600">' + latest.weight + ' kg <span style="font-size:11px">(' + diffStr + ')</span></span>';
-      html += '</div>';
-
-      // Simple bar chart
-      var maxW = Math.max.apply(null, history.map(function(h) { return h.weight; }));
-      if (maxW > 0) {
-        html += '<div class="mini-chart" style="display:flex;align-items:flex-end;gap:2px;height:32px">';
-        history.slice(-10).forEach(function(h) {
-          var pct = maxW > 0 ? (h.weight / maxW * 100) : 0;
-          html += '<div style="flex:1;background:var(--primary);border-radius:2px 2px 0 0;min-height:2px;height:' + pct + '%" title="' + h.date + ': ' + h.weight + ' kg"></div>';
-        });
-        html += '</div>';
-      }
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">';
+      html += '<span style="font-size:13px;font-weight:500">' + ex.name + '</span>';
+      html += '<span style="font-size:13px;color:' + diffColor + ';font-weight:600">' + latest.weight + ' kg <span style="font-size:11px;opacity:0.8">(' + diffStr + ')</span></span>';
       html += '</div>';
     });
+    html += '</div>';
+
+    html += '<div class="chart-container" style="height:300px"><canvas id="strengthChart"></canvas></div>';
     html += '</div>';
   }
 
-  // ── CALF PAIN TRACKER ──
-  var calfHistory = sessions.filter(function(s) { return s.feedback && s.feedback.calfPain !== null && s.feedback.calfPain !== undefined; });
-  if (calfHistory.length > 0) {
+  // ── ENERGY & CALF PAIN CHART ──
+  var sessionsWithFeedback = sessions.filter(function(s) {
+    return s.feedback && (s.feedback.energy || (s.feedback.calfPain !== null && s.feedback.calfPain !== undefined));
+  }).slice(-20);
+  if (sessionsWithFeedback.length >= 2) {
     html += '<div class="card">';
-    html += '<div class="card-header"><span class="icon">\uD83E\uDDB5</span> Kuitpijn trend</div>';
-    var calfLabels = ['Geen', 'Beetje', 'Best wel', 'Veel'];
-    var calfColors = ['var(--success)', '#F39C12', '#E67E22', '#E74C3C'];
-    html += '<div style="display:flex;align-items:flex-end;gap:3px;height:40px;padding:0 4px">';
-    calfHistory.slice(-14).forEach(function(s) {
-      var val = s.feedback.calfPain;
-      var pct = ((val + 1) / 4) * 100;
-      html += '<div style="flex:1;background:' + calfColors[val] + ';border-radius:2px 2px 0 0;height:' + pct + '%;min-height:4px" title="' + s.date + ': ' + calfLabels[val] + '"></div>';
-    });
-    html += '</div>';
-    var lastCalf = calfHistory[calfHistory.length - 1].feedback.calfPain;
-    html += '<div style="font-size:12px;color:var(--text-light);margin-top:6px;padding:0 4px">Laatste: ' + calfLabels[lastCalf] + '</div>';
+    html += '<div class="card-header"><span class="icon">\u26A1</span> Energie & kuitpijn</div>';
+    html += '<div class="chart-container"><canvas id="energyPainChart"></canvas></div>';
     html += '</div>';
   }
 
@@ -2064,12 +2077,10 @@ function renderHistory() {
     var latestM = measurements[measurements.length - 1];
     var firstM = measurements[0];
 
-    // Big current weight display with goal
     html += '<div style="text-align:center;padding:16px 16px 8px">';
     html += '<div style="font-size:36px;font-weight:700;color:var(--primary)">' + latestM.weight + ' kg</div>';
     html += '<div style="font-size:13px;color:var(--text-light);margin-top:4px">Doel: ' + weightGoal + ' kg</div>';
 
-    // Progress towards goal (only show from 2nd measurement)
     if (measurements.length >= 2) {
       var startWeight = firstM.weight;
       var totalToLose = startWeight - weightGoal;
@@ -2083,30 +2094,13 @@ function renderHistory() {
     }
     html += '</div>';
 
-    // Smart motivational message
     html += '<div style="padding:8px 16px 12px">' + getWeightMessage(measurements, weightGoal) + '</div>';
 
-    // Mini weight chart with goal line (only with 2+ measurements)
-    if (measurements.length >= 2) {
-    html += '<div style="position:relative;padding:0 8px">';
-    html += '<div style="display:flex;align-items:flex-end;gap:3px;height:50px;padding:4px">';
-    var mWeights = measurements.map(function(m) { return m.weight; });
-    var allW = mWeights.concat([weightGoal]);
-    var minM = Math.min.apply(null, allW) - 1;
-    var maxM = Math.max.apply(null, allW) + 1;
-    measurements.slice(-12).forEach(function(m) {
-      var pct = maxM > minM ? ((m.weight - minM) / (maxM - minM) * 100) : 50;
-      var barColor = m.weight <= weightGoal ? 'var(--success)' : 'var(--accent)';
-      html += '<div style="flex:1;background:' + barColor + ';border-radius:2px 2px 0 0;height:' + pct + '%;min-height:4px" title="' + m.date + ': ' + m.weight + ' kg"></div>';
-    });
-    html += '</div>';
-    // Goal line
-    if (maxM > minM) {
-      var goalLinePct = ((weightGoal - minM) / (maxM - minM)) * 100;
-      html += '<div style="position:absolute;left:0;right:0;bottom:' + (goalLinePct * 0.5 + 4) + 'px;border-top:2px dashed var(--success);opacity:0.5"></div>';
+    // Taille/heup chart
+    var measWithBody = measurements.filter(function(m) { return m.waist && m.hip; });
+    if (measWithBody.length >= 2) {
+      html += '<div class="chart-container" style="height:220px"><canvas id="waistHipChart"></canvas></div>';
     }
-    html += '</div>';
-    } // end chart if >= 2
 
     var mDiff = (latestM.weight - firstM.weight).toFixed(1);
     var mDiffStr = parseFloat(mDiff) > 0 ? '+' + mDiff : mDiff;
@@ -2114,20 +2108,18 @@ function renderHistory() {
       html += '<div style="font-size:12px;padding:4px 16px 4px;color:var(--text-light)">' + mDiffStr + ' kg sinds start (' + firstM.date + ')</div>';
     }
 
-    // Show waist & hip if available
     var extras = [];
     if (latestM.waist) extras.push('Taille: ' + latestM.waist + ' cm');
     if (latestM.hip) extras.push('Heup: ' + latestM.hip + ' cm');
     if (latestM.waist && latestM.hip) {
       var ratio = (latestM.waist / latestM.hip).toFixed(2);
-      var ratioLabel = parseFloat(ratio) <= 0.80 ? ' ✓ gezond' : parseFloat(ratio) <= 0.85 ? ' — verhoogd' : ' — te hoog';
+      var ratioLabel = parseFloat(ratio) <= 0.80 ? ' \u2713 gezond' : parseFloat(ratio) <= 0.85 ? ' \u2014 verhoogd' : ' \u2014 te hoog';
       extras.push('T/H ratio: ' + ratio + ratioLabel);
     }
     if (extras.length > 0) {
       html += '<div style="font-size:12px;padding:0 16px 12px;color:var(--text-light)">' + extras.join(' \u00b7 ') + '</div>';
     }
 
-    // Alle metingen overzicht (inklapbaar)
     if (measurements.length > 1) {
       html += '<div style="padding:0 16px 12px">';
       html += '<button onclick="toggleMetingenLijst(this)" style="background:none;border:none;color:var(--primary-light);font-size:13px;cursor:pointer;padding:4px 0">Alle metingen (' + measurements.length + ') \u25BC</button>';
@@ -2139,7 +2131,7 @@ function renderHistory() {
         if (m.waist) details += ' \u00b7 T: ' + m.waist + ' cm';
         if (m.hip) details += ' \u00b7 H: ' + m.hip + ' cm';
         html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">';
-        html += '<div><strong>' + formatDateNL(d) + '</strong> — ' + details + '</div>';
+        html += '<div><strong>' + formatDateNL(d) + '</strong> \u2014 ' + details + '</div>';
         html += '<div style="display:flex;gap:6px">';
         html += '<button onclick="editMeasurement(' + idx + ')" style="background:none;border:none;color:var(--primary-light);font-size:16px;cursor:pointer;padding:2px 6px" title="Bewerken">\u270F\uFE0F</button>';
         html += '<button onclick="deleteMeasurement(' + idx + ')" style="background:none;border:none;color:#e74c3c;font-size:16px;cursor:pointer;padding:2px 6px" title="Verwijderen">\uD83D\uDDD1\uFE0F</button>';
@@ -2152,11 +2144,8 @@ function renderHistory() {
   }
   html += '</div>';
 
-  // Measurement reminder / timing advice
   var lastMeasDate = measurements.length > 0 ? measurements[measurements.length - 1].date : null;
   var daysSinceWeight = lastMeasDate ? Math.floor((new Date() - new Date(lastMeasDate)) / 86400000) : 999;
-
-  // Find last body measurement (taille/heup)
   var lastBodyMeas = null;
   for (var bi = measurements.length - 1; bi >= 0; bi--) {
     if (measurements[bi].waist || measurements[bi].hip) { lastBodyMeas = measurements[bi]; break; }
@@ -2164,7 +2153,6 @@ function renderHistory() {
   var daysSinceBody = lastBodyMeas ? Math.floor((new Date() - new Date(lastBodyMeas.date)) / 86400000) : 999;
   var showBodyFields = daysSinceBody >= 30 || !lastBodyMeas;
 
-  // Last measurement date display
   if (lastMeasDate) {
     var lastD = new Date(lastMeasDate);
     var dateStr = lastD.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' });
@@ -2178,7 +2166,6 @@ function renderHistory() {
     }
   }
 
-  // Weight reminder (weekly)
   if (daysSinceWeight >= 7 || measurements.length === 0) {
     html += '<div style="padding:8px 16px;background:rgba(39,174,96,0.06);border-left:3px solid var(--success);margin:0 0 4px;font-size:13px;color:var(--text)">';
     html += '\uD83D\uDCC5 ' + (measurements.length === 0 ? 'Tip: weeg jezelf 1x per week.' : 'Het is weer tijd om je te wegen!');
@@ -2187,7 +2174,6 @@ function renderHistory() {
     html += '<div style="padding:4px 16px;font-size:12px;color:var(--text-light)">Weeg max 1x per week \u2014 dagelijks wegen geeft onnodig stress.</div>';
   }
 
-  // Body measurement reminder (monthly)
   if (showBodyFields) {
     html += '<div style="padding:8px 16px;background:rgba(52,152,219,0.06);border-left:3px solid var(--primary);margin:4px 0;font-size:13px;color:var(--text)">';
     html += '\uD83D\uDCCF ' + (!lastBodyMeas ? 'Tip: meet ook je taille & heup \u2014 1x per maand is genoeg.' : 'Tijd voor je maandelijkse taille/heup meting!');
@@ -2196,18 +2182,14 @@ function renderHistory() {
 
   html += '<div class="checkin-form">';
   html += '<div class="checkin-field"><label>Gewicht (kg)</label><input type="number" step="0.1" id="inputWeight" placeholder="bv. 74.5"></div>';
-
-  // Taille/heup fields: always present but collapsed when not due
   if (showBodyFields) {
-    html += '<div class="checkin-field"><label>Tailleomtrek (cm) <span style="font-weight:400;font-size:11px;color:var(--text-light)">— smalste punt, ter hoogte van navel</span></label><input type="number" step="0.5" id="inputWaist" placeholder="bv. 82"></div>';
-    html += '<div class="checkin-field"><label>Heupomtrek (cm) <span style="font-weight:400;font-size:11px;color:var(--text-light)">— breedste punt van je heupen</span></label><input type="number" step="0.5" id="inputHip" placeholder="bv. 100"></div>';
+    html += '<div class="checkin-field"><label>Tailleomtrek (cm) <span style="font-weight:400;font-size:11px;color:var(--text-light)">\u2014 smalste punt, ter hoogte van navel</span></label><input type="number" step="0.5" id="inputWaist" placeholder="bv. 82"></div>';
+    html += '<div class="checkin-field"><label>Heupomtrek (cm) <span style="font-weight:400;font-size:11px;color:var(--text-light)">\u2014 breedste punt van je heupen</span></label><input type="number" step="0.5" id="inputHip" placeholder="bv. 100"></div>';
   } else {
     html += '<input type="hidden" id="inputWaist" value=""><input type="hidden" id="inputHip" value="">';
   }
-
   html += '<div class="checkin-field"><label>Streefgewicht (kg)</label><input type="number" step="0.5" id="inputGoal" value="' + weightGoal + '"></div>';
 
-  // How to measure guide (collapsible)
   html += '<div style="margin-bottom:12px">';
   html += '<button onclick="toggleMeetAdvies(this)" style="background:none;border:none;color:var(--primary-light);font-size:13px;cursor:pointer;padding:4px 0">Hoe meet ik goed? \u25BC</button>';
   html += '<div class="meet-advies" style="display:none;font-size:12px;color:var(--text-light);line-height:1.6;margin-top:8px;padding:10px;background:var(--bg);border-radius:8px">';
@@ -2215,7 +2197,6 @@ function renderHistory() {
   html += '<p style="margin:0 0 8px"><strong>\uD83D\uDCCF Taille/heup:</strong> 1x per maand. Taille: smalste plek (ter hoogte van navel). Heup: breedste punt. Meetlint horizontaal, niet te strak. Adem rustig uit.</p>';
   html += '<p style="margin:0"><strong>\uD83D\uDCC6 Wanneer:</strong> Altijd op dezelfde dag en tijdstip. Je gewicht schommelt dagelijks 0,5\u20131,5 kg door vocht en voeding \u2014 dat is normaal.</p>';
   html += '</div></div>';
-
   html += '<button class="save-btn" onclick="saveMeasurement()">Meting opslaan</button>';
   html += '</div></div>';
 
@@ -2257,7 +2238,7 @@ function renderHistory() {
   }
   html += '</div></div>';
 
-  // ── INSTELLINGEN: WEEK B ──
+  // ── INSTELLINGEN ──
   var weekBOn = getStore('weekBEnabled', false);
   var weekBReady = isWeekBReady();
   html += '<div class="card">';
@@ -2274,7 +2255,6 @@ function renderHistory() {
   if (!weekBOn && !weekBReady) {
     html += '<div style="font-size:12px;color:var(--text-light);margin-top:4px">Week B wordt aanbevolen als je kuitpijn consequent onder controle is (gemiddeld &lt; 2/3).</div>';
   }
-  // Dark mode toggle
   var darkOn = getStore('darkMode', false);
   html += '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px">';
   html += '<div style="display:flex;align-items:center;justify-content:space-between">';
@@ -2282,8 +2262,6 @@ function renderHistory() {
   html += '<div style="font-size:12px;color:var(--text-light)">Makkelijker voor je ogen in het donker</div></div>';
   html += '<label class="toggle-switch"><input type="checkbox" ' + (darkOn ? 'checked' : '') + ' onchange="toggleDarkMode()"><span class="toggle-slider"></span></label>';
   html += '</div></div>';
-
-  // Reminders toggle
   var remindersOn = getStore('remindersEnabled', false);
   html += '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px">';
   html += '<div style="display:flex;align-items:center;justify-content:space-between">';
@@ -2295,8 +2273,6 @@ function renderHistory() {
     html += '<div style="font-size:12px;color:var(--warning);margin-top:4px">Meldingen zijn geblokkeerd in je browser. Sta ze toe in je instellingen.</div>';
   }
   html += '</div>';
-
-  // Phase info
   var phase = getCurrentPhase();
   var phaseInfo = PHASE_CONFIG[phase];
   var progress = isPhase2Available();
@@ -2324,22 +2300,22 @@ function renderHistory() {
 
   // ── CLOUD SYNC STATUS ──
   html += '<div class="card">';
-  html += '<div class="card-header"><span class="icon">☁️</span> Cloud backup</div>';
+  html += '<div class="card-header"><span class="icon">\u2601\uFE0F</span> Cloud backup</div>';
   html += '<div style="padding:12px 16px">';
   if (typeof getCloudSyncStatus === 'function') {
     var syncStatus = getCloudSyncStatus();
     if (syncStatus.enabled) {
       var lastSync = syncStatus.lastSync ? new Date(syncStatus.lastSync).toLocaleString('nl-NL') : 'nog niet';
       html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
-      html += '<span style="color:var(--success);font-size:18px">●</span>';
+      html += '<span style="color:var(--success);font-size:18px">\u25CF</span>';
       html += '<span style="font-size:14px;font-weight:600;color:var(--success)">Actief</span>';
       html += '</div>';
-      html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:8px">Je data wordt automatisch opgeslagen in de cloud. Telefoon kwijt of browser gewist? Geen probleem — alles wordt hersteld.</p>';
+      html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:8px">Je data wordt automatisch opgeslagen in de cloud. Telefoon kwijt of browser gewist? Geen probleem \u2014 alles wordt hersteld.</p>';
       html += '<p style="font-size:12px;color:var(--text-light)">Laatste sync: ' + lastSync + '</p>';
-      html += '<button class="save-btn" onclick="fullSyncToCloud()" style="margin-top:8px;font-size:13px">🔄 Nu synchroniseren</button>';
+      html += '<button class="save-btn" onclick="fullSyncToCloud()" style="margin-top:8px;font-size:13px">\uD83D\uDD04 Nu synchroniseren</button>';
     } else {
       html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
-      html += '<span style="color:var(--warning);font-size:18px">●</span>';
+      html += '<span style="color:var(--warning);font-size:18px">\u25CF</span>';
       html += '<span style="font-size:14px;font-weight:600;color:var(--warning)">Niet actief</span>';
       html += '</div>';
       html += '<p style="font-size:13px;color:var(--text-light)">Cloud backup is nog niet ingesteld. Je data staat alleen lokaal op dit apparaat.</p>';
@@ -2371,6 +2347,367 @@ function renderHistory() {
   html += '</div></div>';
 
   container.innerHTML = html;
+
+  // Initialize charts after DOM is ready
+  destroyCharts();
+  setTimeout(function() { createProgressCharts(sessions, measurements, weightGoal); }, 60);
+}
+
+// ================================================================
+// CHART CREATION — Professional Chart.js visualizations
+// ================================================================
+function createProgressCharts(sessions, measurements, weightGoal) {
+  if (typeof Chart === 'undefined') return;
+
+  var isDark = document.body.classList.contains('dark');
+  var textColor = isDark ? '#ccc' : '#555';
+  var gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+  var tooltipBg = isDark ? '#333' : '#fff';
+  var tooltipColor = isDark ? '#eee' : '#333';
+
+  var defaultTooltip = {
+    backgroundColor: tooltipBg,
+    titleColor: tooltipColor,
+    bodyColor: tooltipColor,
+    borderColor: isDark ? '#555' : '#ddd',
+    borderWidth: 1,
+    padding: 10,
+    cornerRadius: 8,
+    displayColors: true
+  };
+
+  // ─── 1. WEIGHT TREND ───
+  var weightCanvas = document.getElementById('weightTrendChart');
+  if (weightCanvas && measurements.length >= 2) {
+    var wLabels = measurements.map(function(m) {
+      var d = new Date(m.date);
+      return d.getDate() + '/' + (d.getMonth() + 1);
+    });
+    var wData = measurements.map(function(m) { return m.weight; });
+    var wMin = Math.min.apply(null, wData.concat([weightGoal])) - 1;
+    var wMax = Math.max.apply(null, wData.concat([weightGoal])) + 1;
+
+    _chartInstances.push(new Chart(weightCanvas, {
+      type: 'line',
+      data: {
+        labels: wLabels,
+        datasets: [{
+          label: 'Gewicht',
+          data: wData,
+          borderColor: '#1B4F72',
+          backgroundColor: function(ctx) {
+            var chart = ctx.chart;
+            if (!chart.chartArea) return 'rgba(27,79,114,0.15)';
+            var g = chart.ctx.createLinearGradient(0, chart.chartArea.top, 0, chart.chartArea.bottom);
+            g.addColorStop(0, 'rgba(27,79,114,0.25)');
+            g.addColorStop(1, 'rgba(27,79,114,0.02)');
+            return g;
+          },
+          borderWidth: 2.5,
+          fill: true,
+          tension: 0.35,
+          pointRadius: 4,
+          pointBackgroundColor: '#1B4F72',
+          pointBorderColor: isDark ? '#222' : '#fff',
+          pointBorderWidth: 2,
+          pointHoverRadius: 7,
+          pointHoverBorderWidth: 3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: Object.assign({}, defaultTooltip, {
+            callbacks: {
+              label: function(ctx) { return ctx.parsed.y + ' kg'; }
+            }
+          }),
+          annotation: {
+            annotations: {
+              goalLine: {
+                type: 'line',
+                yMin: weightGoal,
+                yMax: weightGoal,
+                borderColor: 'rgba(39,174,96,0.6)',
+                borderWidth: 2,
+                borderDash: [6, 4],
+                label: {
+                  display: true,
+                  content: 'Doel: ' + weightGoal + ' kg',
+                  position: 'start',
+                  backgroundColor: 'rgba(39,174,96,0.15)',
+                  color: '#27AE60',
+                  font: { size: 11, weight: '600' },
+                  padding: { top: 3, bottom: 3, left: 6, right: 6 }
+                }
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            min: wMin, max: wMax,
+            ticks: { callback: function(v) { return v + ' kg'; }, color: textColor, font: { size: 11 } },
+            grid: { color: gridColor }
+          },
+          x: {
+            ticks: { color: textColor, font: { size: 10 }, maxRotation: 0, maxTicksLimit: 8 },
+            grid: { display: false }
+          }
+        }
+      }
+    }));
+  }
+
+  // ─── 2. TRAINING FREQUENCY ───
+  var freqCanvas = document.getElementById('frequencyChart');
+  if (freqCanvas && sessions.length >= 3) {
+    var weekMap = {};
+    var weekDates = {};
+    sessions.forEach(function(s) {
+      if (s.type === 'skip') return;
+      var d = new Date(s.date);
+      var yr = d.getFullYear();
+      var wk = getISOWeek(d);
+      var key = yr + '-W' + (wk < 10 ? '0' : '') + wk;
+      if (!weekMap[key]) { weekMap[key] = { kracht: 0, cardio: 0 }; weekDates[key] = s.date; }
+      var t = s.type === 'kracht' ? 'kracht' : 'cardio';
+      weekMap[key][t] = (weekMap[key][t] || 0) + 1;
+    });
+
+    var wKeys = Object.keys(weekMap).sort().slice(-12);
+    var wKrachtData = wKeys.map(function(w) { return weekMap[w].kracht || 0; });
+    var wCardioData = wKeys.map(function(w) { return weekMap[w].cardio || 0; });
+    var wLabelsF = wKeys.map(function(w) {
+      var d = new Date(weekDates[w]);
+      return d.getDate() + '/' + (d.getMonth() + 1);
+    });
+
+    _chartInstances.push(new Chart(freqCanvas, {
+      type: 'bar',
+      data: {
+        labels: wLabelsF,
+        datasets: [
+          { label: 'Kracht', data: wKrachtData, backgroundColor: '#1B4F72', borderRadius: 4, barPercentage: 0.7 },
+          { label: 'Cardio', data: wCardioData, backgroundColor: '#E67E22', borderRadius: 4, barPercentage: 0.7 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index' },
+        plugins: {
+          legend: { display: true, position: 'bottom', labels: { color: textColor, padding: 16, usePointStyle: true, pointStyle: 'rectRounded' } },
+          tooltip: defaultTooltip
+        },
+        scales: {
+          x: { stacked: true, ticks: { color: textColor, font: { size: 10 } }, grid: { display: false } },
+          y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1, color: textColor, font: { size: 11 } }, grid: { color: gridColor }, title: { display: true, text: 'Sessies', color: textColor, font: { size: 11 } } }
+        }
+      }
+    }));
+  }
+
+  // ─── 3. STRENGTH PROGRESSION ───
+  var strengthCanvas = document.getElementById('strengthChart');
+  if (strengthCanvas) {
+    var exHistory = buildExerciseHistory(sessions);
+    var colors = ['#1B4F72', '#E67E22', '#27AE60', '#8E44AD', '#2980B9', '#C0392B', '#F39C12', '#16A085'];
+    var datasets = [];
+    var ci = 0;
+
+    // Build unified date labels
+    var allDates = [];
+    Object.keys(exHistory).forEach(function(exId) {
+      if (exHistory[exId].length < 2) return;
+      exHistory[exId].forEach(function(h) {
+        if (allDates.indexOf(h.date) === -1) allDates.push(h.date);
+      });
+    });
+    allDates.sort();
+
+    Object.keys(exHistory).forEach(function(exId) {
+      var hist = exHistory[exId];
+      if (hist.length < 2) return;
+      var ex = getExercise(exId);
+      if (!ex) return;
+      var color = colors[ci % colors.length];
+
+      // Map data to allDates positions (sparse)
+      var dateMap = {};
+      hist.forEach(function(h) { dateMap[h.date] = h.weight; });
+      var mappedData = allDates.map(function(d) { return dateMap[d] !== undefined ? dateMap[d] : null; });
+
+      datasets.push({
+        label: ex.name,
+        data: mappedData,
+        borderColor: color,
+        backgroundColor: color + '20',
+        borderWidth: 2,
+        fill: false,
+        tension: 0.3,
+        spanGaps: true,
+        pointRadius: 3,
+        pointBackgroundColor: color,
+        pointBorderColor: isDark ? '#222' : '#fff',
+        pointBorderWidth: 1.5,
+        pointHoverRadius: 6
+      });
+      ci++;
+    });
+
+    if (datasets.length > 0) {
+      var dateLabels = allDates.map(function(d) {
+        var dt = new Date(d);
+        return dt.getDate() + '/' + (dt.getMonth() + 1);
+      });
+
+      _chartInstances.push(new Chart(strengthCanvas, {
+        type: 'line',
+        data: { labels: dateLabels, datasets: datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'nearest', intersect: false },
+          plugins: {
+            legend: { display: true, position: 'bottom', labels: { color: textColor, padding: 12, usePointStyle: true, pointStyle: 'circle', font: { size: 11 } } },
+            tooltip: Object.assign({}, defaultTooltip, {
+              callbacks: { label: function(ctx) { return ctx.dataset.label + ': ' + ctx.parsed.y + ' kg'; } }
+            })
+          },
+          scales: {
+            x: {
+              ticks: { color: textColor, font: { size: 10 }, maxTicksLimit: 8, maxRotation: 0 },
+              grid: { display: false }
+            },
+            y: {
+              beginAtZero: false,
+              ticks: { callback: function(v) { return v + ' kg'; }, color: textColor, font: { size: 11 } },
+              grid: { color: gridColor },
+              title: { display: true, text: 'Gewicht (kg)', color: textColor, font: { size: 11 } }
+            }
+          }
+        }
+      }));
+    }
+  }
+
+  // ─── 4. ENERGY & CALF PAIN ───
+  var epCanvas = document.getElementById('energyPainChart');
+  if (epCanvas) {
+    var fbSessions = sessions.filter(function(s) {
+      return s.feedback && (s.feedback.energy || (s.feedback.calfPain !== null && s.feedback.calfPain !== undefined));
+    }).slice(-20);
+
+    if (fbSessions.length >= 2) {
+      var epLabels = fbSessions.map(function(s) {
+        var d = new Date(s.date);
+        return d.getDate() + '/' + (d.getMonth() + 1);
+      });
+      var energyData = fbSessions.map(function(s) { return s.feedback.energy || null; });
+      var painData = fbSessions.map(function(s) {
+        return (s.feedback.calfPain !== null && s.feedback.calfPain !== undefined) ? s.feedback.calfPain : null;
+      });
+
+      _chartInstances.push(new Chart(epCanvas, {
+        type: 'bar',
+        data: {
+          labels: epLabels,
+          datasets: [
+            {
+              label: 'Energie',
+              type: 'line',
+              data: energyData,
+              borderColor: '#27AE60',
+              backgroundColor: 'rgba(39,174,96,0.1)',
+              borderWidth: 2.5,
+              fill: true,
+              tension: 0.35,
+              pointRadius: 4,
+              pointBackgroundColor: '#27AE60',
+              pointBorderColor: isDark ? '#222' : '#fff',
+              pointBorderWidth: 2,
+              yAxisID: 'y'
+            },
+            {
+              label: 'Kuitpijn',
+              data: painData,
+              backgroundColor: function(ctx) {
+                var val = ctx.raw;
+                if (val === 0) return 'rgba(39,174,96,0.5)';
+                if (val === 1) return 'rgba(243,156,18,0.6)';
+                if (val === 2) return 'rgba(230,126,34,0.7)';
+                return 'rgba(231,76,60,0.8)';
+              },
+              borderRadius: 4,
+              barPercentage: 0.6,
+              yAxisID: 'y1'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index' },
+          plugins: {
+            legend: { display: true, position: 'bottom', labels: { color: textColor, padding: 16, usePointStyle: true } },
+            tooltip: Object.assign({}, defaultTooltip, {
+              callbacks: {
+                label: function(ctx) {
+                  if (ctx.dataset.label === 'Energie') return 'Energie: ' + ctx.parsed.y + '/5';
+                  var labels = ['Geen', 'Beetje', 'Best wel', 'Veel'];
+                  return 'Kuitpijn: ' + (labels[ctx.parsed.y] || ctx.parsed.y);
+                }
+              }
+            })
+          },
+          scales: {
+            y: { type: 'linear', position: 'left', min: 1, max: 5, title: { display: true, text: 'Energie', color: '#27AE60', font: { size: 11, weight: '600' } }, ticks: { stepSize: 1, color: textColor }, grid: { color: gridColor } },
+            y1: { type: 'linear', position: 'right', min: 0, max: 3, title: { display: true, text: 'Kuitpijn', color: '#E74C3C', font: { size: 11, weight: '600' } }, ticks: { stepSize: 1, color: textColor, callback: function(v) { return ['Geen', 'Beetje', 'Best wel', 'Veel'][v] || v; } }, grid: { display: false } },
+            x: { ticks: { color: textColor, font: { size: 10 }, maxRotation: 0, maxTicksLimit: 10 }, grid: { display: false } }
+          }
+        }
+      }));
+    }
+  }
+
+  // ─── 5. WAIST/HIP TREND ───
+  var whCanvas = document.getElementById('waistHipChart');
+  if (whCanvas) {
+    var measWH = measurements.filter(function(m) { return m.waist && m.hip; });
+    if (measWH.length >= 2) {
+      var whLabels = measWH.map(function(m) { var d = new Date(m.date); return d.getDate() + '/' + (d.getMonth() + 1); });
+      var waistD = measWH.map(function(m) { return m.waist; });
+      var hipD = measWH.map(function(m) { return m.hip; });
+
+      _chartInstances.push(new Chart(whCanvas, {
+        type: 'line',
+        data: {
+          labels: whLabels,
+          datasets: [
+            { label: 'Taille (cm)', data: waistD, borderColor: '#E67E22', backgroundColor: 'rgba(230,126,34,0.08)', borderWidth: 2, fill: true, tension: 0.3, pointRadius: 5, pointBackgroundColor: '#E67E22', pointBorderColor: isDark ? '#222' : '#fff', pointBorderWidth: 2 },
+            { label: 'Heup (cm)', data: hipD, borderColor: '#8E44AD', backgroundColor: 'rgba(142,68,173,0.08)', borderWidth: 2, fill: true, tension: 0.3, pointRadius: 5, pointBackgroundColor: '#8E44AD', pointBorderColor: isDark ? '#222' : '#fff', pointBorderWidth: 2 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: true, position: 'bottom', labels: { color: textColor, padding: 12, usePointStyle: true } },
+            tooltip: Object.assign({}, defaultTooltip, { callbacks: { label: function(ctx) { return ctx.dataset.label + ': ' + ctx.parsed.y + ' cm'; } } })
+          },
+          scales: {
+            y: { beginAtZero: false, ticks: { callback: function(v) { return v + ' cm'; }, color: textColor }, grid: { color: gridColor } },
+            x: { ticks: { color: textColor, font: { size: 10 } }, grid: { display: false } }
+          }
+        }
+      }));
+    }
+  }
 }
 
 // ── EXPORT / IMPORT FUNCTIONS ──

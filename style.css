@@ -111,17 +111,18 @@ body {
    ================================================================ */
 .rest-day-msg {
   text-align: center;
-  padding: 40px 20px;
+  padding: 16px 16px 12px;
 }
-.rest-day-msg .emoji { font-size: 48px; margin-bottom: 16px; }
-.rest-day-msg h2 { font-size: 20px; color: var(--primary); margin-bottom: 8px; }
-.rest-day-msg p { color: var(--text-light); font-size: 14px; line-height: 1.5; }
+.rest-day-msg .emoji { font-size: 36px; margin-bottom: 4px; }
+.rest-day-msg h2 { font-size: 18px; color: var(--primary); margin-bottom: 4px; }
+.rest-day-msg p { color: var(--text-light); font-size: 13px; line-height: 1.4; margin: 0 0 8px; }
+.rest-day-msg div[style*="background"] { text-align: left; }
 
 .vrije-training-btn {
   display: block;
   width: calc(100% - 32px);
-  margin: 16px auto;
-  padding: 16px;
+  margin: 8px auto;
+  padding: 12px;
   background: var(--card);
   border: 2px dashed var(--primary-light);
   border-radius: 14px;
@@ -220,8 +221,8 @@ body {
 }
 .exercise-video {
   width: 100%;
-  max-width: 320px;
-  border-radius: 10px;
+  max-width: 100%;
+  border-radius: 12px;
   margin-bottom: 10px;
   background: transparent;
 }
@@ -1004,4 +1005,15 @@ body {
 /* Prevent iOS zoom on input focus */
 input[type="number"], input[type="text"], textarea, select {
   font-size: 16px !important;
+}
+
+/* ── Chart.js containers ── */
+.chart-container {
+  position: relative;
+  height: 260px;
+  padding: 12px 8px 16px;
+}
+.chart-container canvas {
+  width: 100% !important;
+  max-width: 100%;
 }
