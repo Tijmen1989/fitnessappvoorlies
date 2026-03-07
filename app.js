@@ -2780,6 +2780,14 @@ function renderProfile() {
   html += '<button class="save-btn" onclick="exportCalendar()" style="width:100%">\uD83D\uDCC5 Voeg toe aan agenda</button>';
   html += '</div></div>';
 
+  // ── ONBOARDING OPNIEUW ──
+  html += '<div class="card">';
+  html += '<div class="card-header"><span class="icon">\uD83D\uDCD6</span> Introductie</div>';
+  html += '<div style="padding:14px 16px">';
+  html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:12px">Bekijk de uitleg over het trainingsschema, progressiesysteem en weekindeling opnieuw.</p>';
+  html += '<button onclick="showOnboarding()" style="background:var(--primary);color:white;border:none;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;width:100%">\uD83D\uDCD6 Introductie bekijken</button>';
+  html += '</div></div>';
+
   // ── DATA RESETTEN ──
   html += '<div class="card" style="margin-top:24px">';
   html += '<div class="card-header"><span class="icon">\u26A0\uFE0F</span> Gevarenzone</div>';
@@ -4127,10 +4135,12 @@ function renderOnboardingStep() {
     },
     {
       emoji: '\uD83C\uDFAF',
-      title: 'Laten we beginnen!',
-      text: 'Vul hieronder je startgewicht en streefgewicht in. Je kunt dit later altijd aanpassen bij Voortgang.',
-      form: true,
-      btn: 'Start!'
+      title: getStore('onboardingDone', false) ? 'Dat was het!' : 'Laten we beginnen!',
+      text: getStore('onboardingDone', false)
+        ? 'Je bent helemaal klaar. Ga lekker trainen!'
+        : 'Vul hieronder je startgewicht en streefgewicht in. Je kunt dit later altijd aanpassen bij Voortgang.',
+      form: !getStore('onboardingDone', false),
+      btn: getStore('onboardingDone', false) ? 'Sluiten' : 'Start!'
     }
   ];
 
