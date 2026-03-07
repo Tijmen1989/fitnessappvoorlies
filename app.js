@@ -1,4 +1,9 @@
 // ================================================================
+// APP VERSION
+// ================================================================
+var APP_VERSION = '1.4.0';
+
+// ================================================================
 // STORAGE HELPERS
 // ================================================================
 function getStore(key, def) {
@@ -2452,6 +2457,14 @@ function renderProfile() {
   html += '<button class="save-btn" onclick="cacheAllVideos()" id="cacheVideosBtn">\u2B07 Video\'s downloaden</button>';
   html += '</div></div>';
 
+  // ── AGENDA EXPORT ──
+  html += '<div class="card">';
+  html += '<div class="card-header"><span class="icon">\uD83D\uDCC5</span> Agenda</div>';
+  html += '<div style="padding:14px 16px">';
+  html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:12px">Zet je trainingsschema en wekelijks weegmoment (za 07:15) in je telefoonagenda.</p>';
+  html += '<button class="save-btn" onclick="exportCalendar()" style="width:100%">\uD83D\uDCC5 Voeg toe aan agenda</button>';
+  html += '</div></div>';
+
   // ── DATA RESETTEN ──
   html += '<div class="card" style="margin-top:24px">';
   html += '<div class="card-header"><span class="icon">\u26A0\uFE0F</span> Gevarenzone</div>';
@@ -2459,6 +2472,9 @@ function renderProfile() {
   html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:12px">Verwijder alle trainingsdata en begin opnieuw. Dit kan niet ongedaan worden gemaakt!</p>';
   html += '<button onclick="confirmResetAllData()" style="background:#E74C3C;color:white;border:none;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;width:100%">\uD83D\uDDD1\uFE0F Alle data wissen</button>';
   html += '</div></div>';
+
+  // ── VERSIE ──
+  html += '<div style="text-align:center;padding:20px 16px 40px;font-size:11px;color:var(--text-light);opacity:0.5">Trainingsschema Lisanne v' + APP_VERSION + '</div>';
 
   container.innerHTML = html;
 }
@@ -2842,6 +2858,115 @@ function createProgressCharts(sessions, measurements, weightGoal) {
 }
 
 // ── EXPORT / IMPORT FUNCTIONS ──
+// ── AGENDA / iCAL EXPORT ──
+function exportCalendar() {
+  var weekBEnabled = getStore('weekBEnabled', false);
+  var lines = [];
+  lines.push('BEGIN:VCALENDAR');
+  lines.push('VERSION:2.0');
+  lines.push('PRODID:-//Trainingsschema Lisanne//NL');
+  lines.push('CALSCALE:GREGORIAN');
+  lines.push('METHOD:PUBLISH');
+  lines.push('X-WR-CALNAME:Trainingsschema Lisanne');
+  lines.push('X-WR-TIMEZONE:Europe/Amsterdam');
+
+  // Generate 4 weeks of training events starting from next Monday
+  var now = new Date();
+  var startMonday = new Date(now);
+  startMonday.setDate(startMonday.getDate() - ((startMonday.getDay() + 6) % 7) + 7);
+  startMonday.setHours(0, 0, 0, 0);
+
+  for (var w = 0; w < 4; w++) {
+    var weekStart = new Date(startMonday);
+    weekStart.setDate(weekStart.getDate() + (w * 7));
+    var wkNum = getWeekNumber(weekStart);
+    var weekType = weekBEnabled ? (wkNum % 2 === 0 ? 'A' : 'B') : 'A';
+    var schedule = getSchedule(weekType);
+
+    for (var d = 0; d < 7; d++) {
+      var trainingKey = schedule[d];
+      if (!trainingKey || trainingKey === 'rust') continue;
+
+      var training = TRAINING_DATA[trainingKey];
+      if (!training) continue;
+
+      var eventDate = new Date(weekStart);
+      eventDate.setDate(eventDate.getDate() + ((d === 0 ? 6 : d - 1)));
+      // Map JS day (0=Sun) to Mon-start offset: Mo=0, Di=1, Wo=2, Do=3, Vr=4, Za=5, Zo=6
+      eventDate = new Date(weekStart);
+      eventDate.setDate(weekStart.getDate() + (d === 0 ? 6 : d - 1));
+
+      var dateStr = icsDate(eventDate, 9, 0);
+      var endStr = icsDate(eventDate, 10, 0);
+      var summary = training.name + (weekType === 'B' ? ' (Week B)' : '');
+      var desc = training.type === 'kracht'
+        ? '3 sets per oefening, ±45 min'
+        : training.options
+          ? '±45 min - ' + training.options[0].name
+          : '±35 min';
+
+      lines.push('BEGIN:VEVENT');
+      lines.push('DTSTART;TZID=Europe/Amsterdam:' + dateStr);
+      lines.push('DTEND;TZID=Europe/Amsterdam:' + endStr);
+      lines.push('SUMMARY:' + icsEscape(summary));
+      lines.push('DESCRIPTION:' + icsEscape(desc));
+      lines.push('LOCATION:Sportschool');
+      lines.push('STATUS:CONFIRMED');
+      lines.push('UID:training-' + icsDate(eventDate, 9, 0) + '-' + trainingKey + '@lisanne');
+      lines.push('BEGIN:VALARM');
+      lines.push('TRIGGER:-PT30M');
+      lines.push('ACTION:DISPLAY');
+      lines.push('DESCRIPTION:Over 30 min: ' + icsEscape(summary));
+      lines.push('END:VALARM');
+      lines.push('END:VEVENT');
+    }
+  }
+
+  // Add weekly weigh-in reminder (Saturday 07:15) for 8 weeks
+  for (var ww = 0; ww < 8; ww++) {
+    var satDate = new Date(startMonday);
+    satDate.setDate(startMonday.getDate() + (ww * 7) + 5); // Saturday = Monday + 5
+    lines.push('BEGIN:VEVENT');
+    lines.push('DTSTART;TZID=Europe/Amsterdam:' + icsDate(satDate, 7, 15));
+    lines.push('DTEND;TZID=Europe/Amsterdam:' + icsDate(satDate, 7, 30));
+    lines.push('SUMMARY:' + icsEscape('\u2696\uFE0F Wegen'));
+    lines.push('DESCRIPTION:' + icsEscape('Weeg jezelf: ochtend, na het plassen, voor ontbijt. Open de app en vul je gewicht in bij Voortgang.'));
+    lines.push('STATUS:CONFIRMED');
+    lines.push('UID:weigh-' + icsDate(satDate, 7, 15) + '@lisanne');
+    lines.push('BEGIN:VALARM');
+    lines.push('TRIGGER:PT0M');
+    lines.push('ACTION:DISPLAY');
+    lines.push('DESCRIPTION:Tijd om je te wegen!');
+    lines.push('END:VALARM');
+    lines.push('END:VEVENT');
+  }
+
+  lines.push('END:VCALENDAR');
+
+  var blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'trainingsschema-lisanne.ics';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function icsDate(date, hours, minutes) {
+  var y = date.getFullYear();
+  var m = String(date.getMonth() + 1).padStart(2, '0');
+  var d = String(date.getDate()).padStart(2, '0');
+  var h = String(hours).padStart(2, '0');
+  var min = String(minutes).padStart(2, '0');
+  return y + m + d + 'T' + h + min + '00';
+}
+
+function icsEscape(str) {
+  return str.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+}
+
 function exportData() {
   var data = buildExportData();
   var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });

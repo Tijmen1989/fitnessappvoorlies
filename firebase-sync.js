@@ -327,11 +327,12 @@ function updateSyncIndicator(success) {
     topbar.appendChild(el);
   }
 
+  var ver = typeof APP_VERSION !== 'undefined' ? ' v' + APP_VERSION : '';
   if (success) {
-    el.textContent = '\u2601\uFE0F Synced';
+    el.textContent = '\u2601\uFE0F Synced' + ver;
     el.style.color = 'var(--success, #27AE60)';
   } else {
-    el.textContent = '\u2601\uFE0F Offline';
+    el.textContent = '\u2601\uFE0F Offline' + ver;
     el.style.color = 'var(--warning, #F39C12)';
   }
 
