@@ -1,7 +1,7 @@
 // ================================================================
 // APP VERSION
 // ================================================================
-var APP_VERSION = '1.6.0';
+var APP_VERSION = '1.7.0';
 
 // ================================================================
 // STORAGE HELPERS
@@ -282,21 +282,93 @@ function getLastWeight(exerciseId) {
 }
 
 function getProgressionSuggestion(exerciseId) {
-  var hist = getExerciseHistory(exerciseId);
-  if (hist.length < 3) return null;
-  var last3 = hist.slice(0, 3);
-  // All 3 sessions same weight and all reps completed
-  if (last3[0].weight > 0 && last3.every(function(h) { return h.weight === last3[0].weight; })) {
-    var currentWeight = last3[0].weight;
-    // Suggest small increment
-    var increment = currentWeight < 10 ? 1 : 2.5;
+  var exerciseDef = getExercise(exerciseId);
+  if (!exerciseDef) return null;
+
+  // Parse rep range from exercise definition (e.g. "10-12" → min=10, max=12)
+  var repStr = (exerciseDef.reps || '10').replace(/[^\d\u2013\-]/g, '');
+  var repParts = repStr.split(/[\u2013\-]/);
+  var minReps = parseInt(repParts[0]) || 8;
+  var maxReps = repParts.length > 1 ? (parseInt(repParts[1]) || minReps) : minReps;
+  var numSets = 3;
+
+  // Get last session data with full sets info
+  var sessions = getStore('sessions', []);
+  var lastSession = null;
+  for (var i = sessions.length - 1; i >= 0; i--) {
+    var s = sessions[i];
+    if (s.exercises) {
+      var ex = s.exercises.find(function(e) { return e.id === exerciseId; });
+      if (ex && ex.weight > 0) { lastSession = ex; break; }
+    }
+  }
+  if (!lastSession) return null;
+
+  var lastWeight = lastSession.weight;
+  var lastReps = lastSession.reps || minReps;
+  var lastSets = lastSession.sets || [];
+
+  // Check if all sets hit max reps at this weight
+  var allSetsAtMax = false;
+  if (lastSets.length >= numSets) {
+    allSetsAtMax = lastSets.every(function(set) {
+      return (set.reps || 0) >= maxReps;
+    });
+  } else {
+    // Fallback: use summary reps field
+    allSetsAtMax = lastReps >= maxReps;
+  }
+
+  // Count how many consecutive sessions at this weight hit max reps
+  var consecutiveMaxSessions = 0;
+  for (var j = sessions.length - 1; j >= 0; j--) {
+    var sess = sessions[j];
+    if (!sess.exercises) continue;
+    var exData = sess.exercises.find(function(e) { return e.id === exerciseId; });
+    if (!exData || exData.weight !== lastWeight) break;
+    var setsOk = false;
+    if (exData.sets && exData.sets.length >= numSets) {
+      setsOk = exData.sets.every(function(set) { return (set.reps || 0) >= maxReps; });
+    } else {
+      setsOk = (exData.reps || 0) >= maxReps;
+    }
+    if (setsOk) consecutiveMaxSessions++;
+    else break;
+  }
+
+  // DOUBLE PROGRESSION LOGIC:
+  var increment = lastWeight < 10 ? 1 : 2.5;
+
+  if (consecutiveMaxSessions >= 2) {
+    // Hit max reps for 2+ sessions → increase weight, drop to min reps
     return {
       ready: true,
-      current: currentWeight,
-      suggested: currentWeight + increment,
-      message: 'Probeer ' + (currentWeight + increment) + ' kg'
+      current: lastWeight,
+      suggested: lastWeight + increment,
+      targetReps: minReps,
+      message: '\uD83D\uDCAA Verhoog naar ' + (lastWeight + increment) + ' kg \u00b7 ' + numSets + '\u00d7' + minReps
+    };
+  } else if (allSetsAtMax) {
+    // Hit max reps once → do it again to confirm
+    return {
+      ready: false,
+      current: lastWeight,
+      suggested: lastWeight,
+      targetReps: maxReps,
+      message: '\u2705 ' + lastWeight + ' kg \u00b7 ' + numSets + '\u00d7' + maxReps + ' (nog 1x bevestigen)'
+    };
+  } else if (lastReps < maxReps) {
+    // Not at max reps yet → suggest more reps at same weight
+    var nextReps = Math.min(lastReps + 1, maxReps);
+    return {
+      ready: false,
+      current: lastWeight,
+      suggested: lastWeight,
+      targetReps: nextReps,
+      message: lastWeight + ' kg \u00b7 probeer ' + numSets + '\u00d7' + nextReps
     };
   }
+
   return null;
 }
 
@@ -446,11 +518,10 @@ function renderTrainingStep() {
   html += '<div class="tm-exercise-name">' + ex.name + '</div>';
   html += '<div class="tm-exercise-detail">' + ex.apparaat + ' \u00b7 ' + ex.reps + '</div>';
 
-  if (prevWeight > 0) {
+  if (progression) {
+    html += '<div class="tm-suggestion" style="color:' + (progression.ready ? 'var(--success)' : 'var(--text-light)') + '">' + progression.message + '</div>';
+  } else if (prevWeight > 0) {
     html += '<div class="tm-prev-weight">Vorige: ' + prevWeight + ' kg</div>';
-  }
-  if (progression && progression.ready) {
-    html += '<div class="tm-suggestion">\uD83D\uDCAA ' + progression.message + '</div>';
   }
 
   if (!ex.isPlank) {
@@ -1556,10 +1627,11 @@ function renderKrachtOverview(container, training, trainingKey, todayKey, motivH
     html += '<div class="ex-info">';
     html += '<div class="ex-name">' + ex.name + '</div>';
     html += '<div class="ex-detail">' + ex.apparaat + ' \u00b7 ' + ex.reps;
-    if (prevWeight > 0) html += ' \u00b7 Vorige: ' + prevWeight + ' kg';
+    if (prevWeight > 0 && !progression) html += ' \u00b7 Vorige: ' + prevWeight + ' kg';
     html += '</div>';
-    if (progression && progression.ready) {
-      html += '<div style="font-size:12px;color:var(--success);margin-top:3px">\uD83D\uDCAA ' + progression.message + '</div>';
+    if (progression) {
+      var pColor = progression.ready ? 'var(--success)' : 'var(--text-light)';
+      html += '<div style="font-size:12px;color:' + pColor + ';margin-top:3px">' + progression.message + '</div>';
     }
     html += '</div>';
     html += '<div class="ex-expand" onclick="toggleOverviewInstruction(\'' + exId + '\')">\u2139\uFE0F</div>';
@@ -3749,10 +3821,11 @@ function renderKrachtPreview(container, training, trainingKey) {
     html += '<div class="ex-info">';
     html += '<div class="ex-name">' + ex.name + '</div>';
     html += '<div class="ex-detail">' + ex.apparaat + ' \u00b7 ' + ex.reps;
-    if (prevWeight > 0) html += ' \u00b7 Vorige: ' + prevWeight + ' kg';
+    if (prevWeight > 0 && !progression) html += ' \u00b7 Vorige: ' + prevWeight + ' kg';
     html += '</div>';
-    if (progression && progression.ready) {
-      html += '<div style="font-size:12px;color:var(--success);margin-top:3px">\uD83D\uDCAA ' + progression.message + '</div>';
+    if (progression) {
+      var pColor = progression.ready ? 'var(--success)' : 'var(--text-light)';
+      html += '<div style="font-size:12px;color:' + pColor + ';margin-top:3px">' + progression.message + '</div>';
     }
     html += '</div>';
     html += '<div class="ex-expand" onclick="togglePreviewInstruction(\'' + exId + '\')">\u2139\uFE0F</div>';
