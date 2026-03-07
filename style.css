@@ -255,6 +255,13 @@ iframe.exercise-video {
 .exercise-video-container {
   text-align: center;
 }
+video.exercise-video {
+  width: 100%;
+  max-width: 400px;
+  border-radius: 12px;
+  display: block;
+  margin: 0 auto;
+}
 
 .instr-focus {
   font-size: 12px;
@@ -262,13 +269,13 @@ iframe.exercise-video {
   margin-bottom: 6px;
   padding-left: 4px;
 }
-.instr-focus::before { content: '\2714\FE0F '; }
+.instr-focus::before { content: '\2714\FE0F  '; }
 .instr-mistake {
   font-size: 12px;
   color: var(--danger);
   padding-left: 4px;
 }
-.instr-mistake::before { content: '\26A0\FE0F '; }
+.instr-mistake::before { content: '\26A0\FE0F  '; }
 
 /* ================================================================
    WEIGHT INPUT
