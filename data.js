@@ -7,11 +7,12 @@ const EXERCISE_DB = {
     id: 'chest-press',
     name: 'Chest press',
     apparaat: 'Multipress \u2013 liggend',
-    reps: '10\u201312',
-    defaultReps: 12,
+    reps: '8\u201312',
+    defaultReps: 8,
     rest: 90,
     tip: 'Langzaam omhoog duwen, niet de armen volledig strekken',
     videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-Machine-machine-chest-press-side.mp4',
+    youtubeId: 'xUm0BiZCWlQ',
     instruction: {
       goal: 'Borst en voorkant van de armen trainen.',
       steps: [
@@ -28,11 +29,12 @@ const EXERCISE_DB = {
     id: 'incline-press',
     name: 'Incline chest press',
     apparaat: 'Multipress \u2013 half liggend',
-    reps: '10\u201312',
-    defaultReps: 12,
+    reps: '8\u201312',
+    defaultReps: 8,
     rest: 90,
     tip: 'Zelfde beweging als chest press, iets meer schouder-activatie',
     videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-dumbbell-incline-bench-press-side_cQCX9or.mp4',
+    youtubeId: '8iPEnn-ltC8',
     instruction: {
       goal: 'Bovenste deel van de borst en voorkant schouders trainen.',
       steps: [
@@ -49,11 +51,12 @@ const EXERCISE_DB = {
     id: 'shoulder-press',
     name: 'Shoulder press',
     apparaat: 'Multipress \u2013 rechtop',
-    reps: '10',
-    defaultReps: 10,
+    reps: '8\u201312',
+    defaultReps: 8,
     rest: 90,
     tip: 'Niet hoger duwen dan comfortabel, schouders laag houden',
     videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-dumbbell-seated-overhead-press-side.mp4',
+    youtubeId: 'qEwKCR5JCog',
     instruction: {
       goal: 'Schouders en bovenste deel van de armen trainen.',
       steps: [
@@ -70,11 +73,12 @@ const EXERCISE_DB = {
     id: 'dumbbell-row',
     name: 'Dumbbell row',
     apparaat: 'Dumbbell + bankje',
-    reps: '10 per arm',
-    defaultReps: 10,
+    reps: '8\u201312 per arm',
+    defaultReps: 8,
     rest: 90,
     tip: 'Rug recht, elleboog langs lichaam omhoog trekken',
     videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-Dumbbells-dumbbell-row-unilateral-side.mp4',
+    youtubeId: 'pYcpY20QaE8',
     instruction: {
       goal: 'Rug en achterkant van de armen trainen.',
       steps: [
@@ -91,11 +95,12 @@ const EXERCISE_DB = {
     id: 'leg-ext',
     name: 'Leg extension',
     apparaat: 'Leg extension apparaat',
-    reps: '12',
-    defaultReps: 12,
+    reps: '8\u201312',
+    defaultReps: 8,
     rest: 90,
     tip: 'Langzaam omhoog, gecontroleerd terug laten zakken',
     videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-machine-leg-extension-side.mp4',
+    youtubeId: 'YyvSfVjQeL0',
     instruction: {
       goal: 'Voorkant van de bovenbenen (quadriceps) trainen.',
       steps: [
@@ -112,11 +117,12 @@ const EXERCISE_DB = {
     id: 'leg-curl',
     name: 'Leg curl',
     apparaat: 'Leg curl apparaat',
-    reps: '12',
-    defaultReps: 12,
+    reps: '8\u201312',
+    defaultReps: 8,
     rest: 90,
     tip: 'Langzaam buigen, niet met een ruk',
     videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-Machine-machine-seated-leg-curl-side.mp4',
+    youtubeId: 'ELOCsoDSmrg',
     instruction: {
       goal: 'Achterkant van de bovenbenen (hamstrings) trainen.',
       steps: [
@@ -139,6 +145,7 @@ const EXERCISE_DB = {
     tip: 'Lichaam recht, billen niet omhoog of omlaag',
     isPlank: true,
     videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-bodyweight-hand-plank-side_PurCsSV.mp4',
+    youtubeId: 'pSHjTRCQxIw',
     instruction: {
       goal: 'Buikspieren en core (romp) sterker maken.',
       steps: [
@@ -163,6 +170,7 @@ const EXERCISE_DB = {
     phase: 2,
     tip: 'Heupen omhoog, lichaam in rechte lijn',
     videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-bodyweight-elbow-side-plank-front.mp4',
+    youtubeId: 'fLkJT44bRHo',
     instruction: {
       goal: 'Zijwaartse buikspieren en core sterker maken.',
       steps: [

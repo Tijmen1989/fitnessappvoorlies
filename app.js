@@ -255,8 +255,7 @@ function getSmartRestDayTip(dayOfWeek, isCycling) {
 // ================================================================
 // VIDEO / IMAGE HELPER
 // ================================================================
-// MuscleWiki's video server stopped delivering mp4 data.
-// Their OG images still work. Show image first, try video in background.
+// Priority: YouTube embed > MuscleWiki OG image fallback
 function videoUrlToImageUrl(videoUrl) {
   if (!videoUrl) return '';
   return videoUrl
@@ -266,42 +265,29 @@ function videoUrlToImageUrl(videoUrl) {
 }
 
 function renderVideoHtml(ex) {
-  if (!ex.videoUrl) return '';
-  var imgUrl = videoUrlToImageUrl(ex.videoUrl);
-  return '<div class="exercise-video-container">' +
-    '<img class="exercise-image" src="' + imgUrl + '" alt="' + (ex.name || 'Oefening') + '" ' +
-    'loading="lazy" onerror="this.parentElement.style.display=\'none\'" ' +
-    'onload="this.classList.add(\'loaded\')">' +
-    '<video class="exercise-video" data-src="' + ex.videoUrl + '" loop muted playsinline preload="none" ' +
-    'style="display:none" ' +
-    'onerror="this.style.display=\'none\'" ' +
-    'onloadeddata="this.classList.add(\'loaded\');this.style.display=\'block\';' +
-    'var img=this.parentElement.querySelector(\'.exercise-image\');if(img)img.style.display=\'none\';' +
-    'this.play().catch(function(){})">' +
-    '</video></div>';
+  // YouTube embed (primary)
+  if (ex.youtubeId) {
+    return '<div class="exercise-video-container">' +
+      '<iframe class="exercise-video loaded" ' +
+      'src="https://www.youtube.com/embed/' + ex.youtubeId + '?rel=0&modestbranding=1" ' +
+      'title="' + (ex.name || 'Oefening') + '" ' +
+      'frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" ' +
+      'allowfullscreen loading="lazy"></iframe></div>';
+  }
+  // MuscleWiki OG image fallback
+  if (ex.videoUrl) {
+    var imgUrl = videoUrlToImageUrl(ex.videoUrl);
+    return '<div class="exercise-video-container">' +
+      '<img class="exercise-image" src="' + imgUrl + '" alt="' + (ex.name || 'Oefening') + '" ' +
+      'loading="lazy" onerror="this.parentElement.style.display=\'none\'" ' +
+      'onload="this.classList.add(\'loaded\')">' +
+      '</div>';
+  }
+  return '';
 }
 
-// Lazy-load: try to load video in background when container is visible
+// Init observer (YouTube iframes handle their own lazy loading)
 function initVideoObserver() {
-  if (!('IntersectionObserver' in window)) return;
-  var observer = new IntersectionObserver(function(entries) {
-    entries.forEach(function(entry) {
-      if (entry.isIntersecting) {
-        var container = entry.target;
-        var video = container.querySelector('video.exercise-video');
-        if (video && video.dataset.src && !video.src) {
-          video.src = video.dataset.src;
-          video.preload = 'metadata';
-          video.load();
-        }
-        observer.unobserve(container);
-      }
-    });
-  }, { rootMargin: '200px' });
-
-  document.querySelectorAll('.exercise-video-container').forEach(function(c) {
-    observer.observe(c);
-  });
 }
 
 
@@ -512,8 +498,8 @@ function getProgressionSuggestion(exerciseId) {
       message: '\u2705 ' + lastWeight + ' ' + unit + ' \u00b7 ' + numSets + '\u00d7' + maxReps + ' (nog 1x bevestigen)'
     };
   } else if (lastReps < maxReps) {
-    // Not at max reps yet → suggest more reps at same weight
-    var nextReps = Math.min(lastReps + 1, maxReps);
+    // Not at max reps yet → suggest more reps at same weight (steps of 2: 8→10→12)
+    var nextReps = Math.min(lastReps + 2, maxReps);
     return {
       ready: false,
       current: lastWeight,

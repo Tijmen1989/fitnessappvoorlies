@@ -245,6 +245,10 @@ body {
   margin-left: auto;
   margin-right: auto;
 }
+iframe.exercise-video {
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+}
 .exercise-video.loaded, .exercise-image.loaded {
   display: block;
 }
