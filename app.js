@@ -1,7 +1,7 @@
 // ================================================================
 // APP VERSION
 // ================================================================
-var APP_VERSION = '1.8.0';
+var APP_VERSION = '1.9.0';
 
 // ================================================================
 // STORAGE HELPERS
@@ -927,7 +927,7 @@ function renderFeedbackForm() {
   html += '<div style="font-size:14px;color:var(--text-light);margin-bottom:8px">Kuitpijn vandaag?</div>';
   html += '<div class="feedback-stars" id="feedbackCalf" style="display:flex;gap:8px">';
   var calfLabels = ['Nee', 'Beetje', 'Best wel', 'Veel'];
-  var calfColors = ['var(--success)', '#F39C12', '#E67E22', '#E74C3C'];
+  var calfColors = ['var(--success)', 'var(--warning)', 'var(--accent)', 'var(--danger)'];
   for (var c = 0; c < 4; c++) {
     html += '<button class="feedback-calf-btn" data-value="' + c + '" onclick="selectFeedback(\'feedbackCalf\',' + c + ',this)" ';
     html += 'style="flex:1;min-height:48px;padding:12px 4px;border:2px solid var(--border);border-radius:12px;background:var(--card);font-size:13px;font-weight:600;cursor:pointer;text-align:center">';
@@ -1550,12 +1550,12 @@ function renderRestDay(container, dayOfWeek, motivHtml) {
   html += '<h2 style="margin:0 0 4px;font-size:18px">' + (isCycling ? 'Fietsdag' : 'Rustdag') + '</h2>';
   if (isCycling) {
     html += '<p style="margin:0 0 8px;font-size:13px">Vandaag fiets je naar school en terug \u2014 dat is al \u00b130 min cardio.</p>';
-    html += '<div style="text-align:left;padding:8px 12px;background:rgba(39,174,96,0.06);border-radius:8px;font-size:12px;color:var(--text);line-height:1.4">';
+    html += '<div style="text-align:left;padding:8px 12px;background:var(--hint-bg);border-radius:8px;font-size:12px;color:var(--text);line-height:1.4">';
     html += '\uD83D\uDEB6 <strong>Beweegadvies:</strong> Probeer ook 20\u201330 min te wandelen (\u00b12.000\u20133.000 stappen). Bijv. een rondje met Milou.';
     html += '</div>';
   } else {
     html += '<p style="margin:0 0 8px;font-size:13px">Licht bewegen of stretchen helpt je lichaam sneller herstellen.</p>';
-    html += '<div style="text-align:left;padding:8px 12px;background:rgba(39,174,96,0.06);border-radius:8px;font-size:12px;color:var(--text);line-height:1.4">';
+    html += '<div style="text-align:left;padding:8px 12px;background:var(--hint-bg);border-radius:8px;font-size:12px;color:var(--text);line-height:1.4">';
     html += '\uD83D\uDEB6 <strong>Beweegadvies:</strong> Probeer 30\u201345 min te wandelen (\u00b13.000\u20134.500 stappen). Goed voor herstel en vetverbranding.';
     html += '</div>';
   }
@@ -2220,7 +2220,7 @@ function renderHistory() {
       var first = history[0];
       var diff = latest.weight - first.weight;
       var diffStr = diff > 0 ? '+' + diff : (diff < 0 ? '' + diff : '\u00B10');
-      var diffColor = diff > 0 ? 'var(--success)' : (diff < 0 ? '#E74C3C' : 'var(--text-light)');
+      var diffColor = diff > 0 ? 'var(--success)' : (diff < 0 ? 'var(--danger)' : 'var(--text-light)');
       html += '<tr style="border-bottom:1px solid var(--border)">';
       html += '<td style="padding:6px 16px 6px 16px;font-weight:500">' + ex.name + '</td>';
       html += '<td style="padding:6px 4px;font-weight:700;text-align:right;white-space:nowrap">' + latest.weight + ' kg</td>';
@@ -2338,13 +2338,13 @@ function renderHistory() {
   }
 
   if (daysSinceWeight >= 7 || measurements.length === 0) {
-    html += '<div style="padding:8px 16px;background:rgba(39,174,96,0.06);border-left:3px solid var(--success);margin:0 0 4px;font-size:13px;color:var(--text)">';
+    html += '<div style="padding:8px 16px;background:var(--hint-bg);border-left:3px solid var(--success);margin:0 0 4px;font-size:13px;color:var(--text)">';
     html += '\uD83D\uDCC5 ' + (measurements.length === 0 ? 'Tip: weeg jezelf 1x per week.' : 'Het is weer tijd om je te wegen!');
     html += '</div>';
   }
 
   if (showBodyFields) {
-    html += '<div style="padding:8px 16px;background:rgba(52,152,219,0.06);border-left:3px solid var(--primary);margin:4px 0;font-size:13px;color:var(--text)">';
+    html += '<div style="padding:8px 16px;background:var(--info-bg);border-left:3px solid var(--primary);margin:4px 0;font-size:13px;color:var(--text)">';
     html += '\uD83D\uDCCF ' + (!lastBodyMeas ? 'Tip: meet ook je taille & heup \u2014 1x per maand is genoeg.' : 'Tijd voor je maandelijkse taille/heup meting!');
     html += '</div>';
   }
@@ -2452,7 +2452,7 @@ function renderHistory() {
           });
         }
         html += '<div style="display:flex;justify-content:flex-end;margin-top:6px">';
-        html += '<button onclick="deleteSession(' + sIdx + ')" style="background:none;border:none;color:#E74C3C;font-size:12px;cursor:pointer;padding:4px 8px;opacity:0.6">Verwijderen</button>';
+        html += '<button onclick="deleteSession(' + sIdx + ')" style="background:none;border:none;color:var(--danger);font-size:12px;cursor:pointer;padding:4px 8px;opacity:0.6">Verwijderen</button>';
         html += '</div>';
         html += '</div>';
         html += '</div>';
@@ -2674,7 +2674,7 @@ function renderProfile() {
   html += '<div class="card-header"><span class="icon">\u26A0\uFE0F</span> Gevarenzone</div>';
   html += '<div style="padding:14px 16px">';
   html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:12px">Verwijder alle trainingsdata en begin opnieuw. Dit kan niet ongedaan worden gemaakt!</p>';
-  html += '<button onclick="confirmResetAllData()" style="background:#E74C3C;color:white;border:none;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;width:100%">\uD83D\uDDD1\uFE0F Alle data wissen</button>';
+  html += '<button onclick="confirmResetAllData()" style="background:var(--danger);color:white;border:none;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;width:100%">\uD83D\uDDD1\uFE0F Alle data wissen</button>';
   html += '</div></div>';
 
   // ── VERSIE ──
@@ -2983,10 +2983,11 @@ function createProgressCharts(sessions, measurements, weightGoal) {
               pointRadius: isMobile ? 3 : 4,
               pointBackgroundColor: function(ctx) {
                 var val = ctx.raw;
-                if (!val || val <= 1) return '#27AE60';
-                if (val === 2) return '#F39C12';
-                if (val === 3) return '#E67E22';
-                return '#E74C3C';
+                var cs = getComputedStyle(document.documentElement);
+                if (!val || val <= 1) return cs.getPropertyValue('--success').trim();
+                if (val === 2) return cs.getPropertyValue('--warning').trim();
+                if (val === 3) return cs.getPropertyValue('--accent').trim();
+                return cs.getPropertyValue('--danger').trim();
               },
               pointBorderColor: isDark ? '#222' : '#fff',
               pointBorderWidth: 1.5,
@@ -3723,7 +3724,7 @@ function renderAgenda() {
   var html = '<div class="agenda-legend">';
   html += '<div class="agenda-legend-item"><div class="agenda-legend-dot" style="background:var(--primary)"></div>Kracht</div>';
   html += '<div class="agenda-legend-item"><div class="agenda-legend-dot" style="background:var(--accent)"></div>Cardio</div>';
-  html += '<div class="agenda-legend-item"><div class="agenda-legend-dot" style="background:#BDC3C7"></div>Fietsen</div>';
+  html += '<div class="agenda-legend-item"><div class="agenda-legend-dot" style="background:var(--neutral-bg)"></div>Fietsen</div>';
   html += '<div class="agenda-legend-item"><div class="agenda-legend-dot" style="background:transparent;border:2px solid var(--border)"></div>Rust</div>';
   html += '</div>';
 
