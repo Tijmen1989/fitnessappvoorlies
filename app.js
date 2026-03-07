@@ -1,7 +1,7 @@
 // ================================================================
 // APP VERSION
 // ================================================================
-var APP_VERSION = '1.7.0';
+var APP_VERSION = '1.8.0';
 
 // ================================================================
 // STORAGE HELPERS
@@ -281,6 +281,22 @@ function getLastWeight(exerciseId) {
   return hist.length > 0 ? hist[0].weight : 0;
 }
 
+function getWeightStep(exerciseId) {
+  var custom = getStore('weightSteps', {});
+  if (custom[exerciseId]) return custom[exerciseId];
+  // Defaults: machines typically 2.5 or 5 kg, dumbbells 1 or 2 kg
+  var ex = getExercise(exerciseId);
+  if (!ex) return 2.5;
+  if (ex.apparaat && ex.apparaat.indexOf('Dumbbell') >= 0) return 2;
+  return 2.5;
+}
+
+function setWeightStep(exerciseId, step) {
+  var custom = getStore('weightSteps', {});
+  custom[exerciseId] = parseFloat(step) || 2.5;
+  setStore('weightSteps', custom);
+}
+
 function getProgressionSuggestion(exerciseId) {
   var exerciseDef = getExercise(exerciseId);
   if (!exerciseDef) return null;
@@ -337,7 +353,7 @@ function getProgressionSuggestion(exerciseId) {
   }
 
   // DOUBLE PROGRESSION LOGIC:
-  var increment = lastWeight < 10 ? 1 : 2.5;
+  var increment = getWeightStep(exerciseId);
 
   if (consecutiveMaxSessions >= 2) {
     // Hit max reps for 2+ sessions → increase weight, drop to min reps
@@ -2530,6 +2546,30 @@ function renderProfile() {
   html += '</div>';
   html += '</div></div>';
 
+  // ── GEWICHTSSTAPPEN PER OEFENING ──
+  html += '<div class="card">';
+  html += '<div class="card-header"><span class="icon">\uD83C\uDFCB\uFE0F</span> Gewichtsstappen</div>';
+  html += '<div style="padding:14px 16px">';
+  html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:10px">De gewichtsstap per apparaat voor progressie-adviezen. Pas aan naar jouw sportschool.</p>';
+  var allExIds = Object.keys(typeof EXERCISE_DB !== 'undefined' ? EXERCISE_DB : {});
+  var krachtExIds = allExIds.filter(function(id) { var e = getExercise(id); return e && !e.isPlank; });
+  html += '<table style="width:100%;border-collapse:collapse;font-size:13px">';
+  krachtExIds.forEach(function(exId) {
+    var ex = getExercise(exId);
+    if (!ex) return;
+    var step = getWeightStep(exId);
+    html += '<tr style="border-bottom:1px solid var(--border)">';
+    html += '<td style="padding:8px 0">' + ex.name + '</td>';
+    html += '<td style="padding:8px 0;text-align:right;width:90px">';
+    html += '<select onchange="setWeightStep(\'' + exId + '\',this.value);renderProfile()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--card);color:var(--text)">';
+    [1, 1.25, 2, 2.5, 5].forEach(function(v) {
+      html += '<option value="' + v + '"' + (step === v ? ' selected' : '') + '>' + v + ' kg</option>';
+    });
+    html += '</select></td></tr>';
+  });
+  html += '</table>';
+  html += '</div></div>';
+
   // ── CLOUD SYNC & KOPPELCODE ──
   html += '<div class="card">';
   html += '<div class="card-header"><span class="icon">\u2601\uFE0F</span> Cloud & Multi-device</div>';
@@ -3949,21 +3989,34 @@ function renderOnboardingStep() {
     {
       emoji: '\uD83C\uDFCB\uFE0F\u200D\u2640\uFE0F',
       title: 'Welkom Lisanne!',
-      text: 'Dit is jouw persoonlijke trainingsapp. Speciaal voor jou gemaakt, met een schema dat past bij jouw niveau en doelen.',
-      sub: 'Geen ingewikkelde menu\u2019s \u2014 open de app, en je ziet meteen wat je vandaag kunt doen.',
-      btn: 'Volgende'
+      text: 'Dit is jouw persoonlijke trainingsapp. Speciaal voor jou gemaakt, met oefeningen, video\u2019s en progressie die bij jou passen.',
+      btn: 'Hoe werkt het?'
     },
     {
       emoji: '\uD83D\uDCC5',
-      title: 'Hoe werkt het?',
-      text: 'Elke dag zie je wat er op het programma staat. Krachttraining met uitleg en video\u2019s, cardio, of een rustdag met stretches.',
-      sub: 'Na elke training geef je kort aan hoe het ging. Zo houd je je voortgang bij en kan het schema zich aanpassen.',
+      title: 'Jouw weekschema',
+      text: 'Je traint 4 dagen per week met een vast schema:',
+      sub: '<div style="text-align:left;line-height:2;font-size:14px">\uD83D\uDD35 <b>Dinsdag</b> \u2014 Loopband wandelen (35 min)<br>\uD83D\uDD35 <b>Woensdag</b> \u2014 Kracht: onderlichaam<br>\uD83D\uDD35 <b>Zaterdag</b> \u2014 Kracht: bovenlichaam<br>\uD83D\uDFE0 <b>Zondag</b> \u2014 Cardio variatie (45 min)</div>',
+      btn: 'Volgende'
+    },
+    {
+      emoji: '\uD83D\uDCAA',
+      title: 'Progressie',
+      text: 'Bij krachttraining houdt de app bij wat je vorige keer deed. Je bouwt langzaam op:',
+      sub: '<div style="text-align:left;font-size:13px;line-height:1.8">1\uFE0F\u20E3 Begin op 3\u00d78 herhalingen<br>2\uFE0F\u20E3 Verhoog naar 3\u00d710, dan 3\u00d712<br>3\uFE0F\u20E3 Lukt 3\u00d712 twee keer? Gewicht omhoog!<br><br>De app vertelt je precies wanneer.</div>',
+      btn: 'Volgende'
+    },
+    {
+      emoji: '\uD83D\uDCCA',
+      title: 'Voortgang bijhouden',
+      text: 'Weeg jezelf 1x per week (zaterdag voor ontbijt). De app toont je trend, krachtprogressie en energielevel in mooie grafieken.',
+      sub: 'Geen stress over dagelijkse schommelingen \u2014 het gaat om de trend.',
       btn: 'Volgende'
     },
     {
       emoji: '\uD83C\uDFAF',
       title: 'Laten we beginnen!',
-      text: 'Vul hieronder je startgewicht en streefgewicht in. Je kunt dit later altijd aanpassen.',
+      text: 'Vul hieronder je startgewicht en streefgewicht in. Je kunt dit later altijd aanpassen bij Voortgang.',
       form: true,
       btn: 'Start!'
     }
@@ -4005,7 +4058,7 @@ function renderOnboardingStep() {
 }
 
 function nextOnboardingStep() {
-  if (onboardingStep === 2) {
+  if (onboardingStep === 4) {
     // Save initial measurement if provided
     var weightEl = document.getElementById('onboardWeight');
     var goalEl = document.getElementById('onboardGoal');
