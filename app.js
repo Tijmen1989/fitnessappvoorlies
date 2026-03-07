@@ -1,7 +1,7 @@
 // ================================================================
 // APP VERSION
 // ================================================================
-var APP_VERSION = '1.4.0';
+var APP_VERSION = '1.5.0';
 
 // ================================================================
 // STORAGE HELPERS
@@ -1994,21 +1994,96 @@ function getISOWeek(date) {
   return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 }
 
+var _historyFilter = getStore('historyFilter', 'all'); // '4w', '8w', 'all', 'custom'
+var _historyFrom = getStore('historyFrom', '');
+var _historyTo = getStore('historyTo', '');
+
+function setHistoryFilter(period) {
+  _historyFilter = period;
+  setStore('historyFilter', period);
+  if (period !== 'custom') {
+    _historyFrom = '';
+    _historyTo = '';
+    setStore('historyFrom', '');
+    setStore('historyTo', '');
+  }
+  renderHistory();
+}
+
+function setHistoryCustomRange() {
+  var fromEl = document.getElementById('filterFrom');
+  var toEl = document.getElementById('filterTo');
+  if (fromEl) { _historyFrom = fromEl.value; setStore('historyFrom', fromEl.value); }
+  if (toEl) { _historyTo = toEl.value; setStore('historyTo', toEl.value); }
+  _historyFilter = 'custom';
+  setStore('historyFilter', 'custom');
+  renderHistory();
+}
+
+function filterByPeriod(items, dateKey) {
+  if (_historyFilter === 'all') return items;
+  var now = new Date();
+  var from, to;
+  if (_historyFilter === 'custom') {
+    from = _historyFrom ? new Date(_historyFrom) : new Date(0);
+    to = _historyTo ? new Date(_historyTo + 'T23:59:59') : now;
+  } else {
+    var weeks = _historyFilter === '4w' ? 4 : 8;
+    from = new Date(now);
+    from.setDate(from.getDate() - (weeks * 7));
+    to = now;
+  }
+  return items.filter(function(item) {
+    var d = new Date(item[dateKey]);
+    return d >= from && d <= to;
+  });
+}
+
 function renderHistory() {
-  var sessions = getStore('sessions', []);
-  var measurements = getStore('measurements', []);
+  var allSessions = getStore('sessions', []);
+  var allMeasurements = getStore('measurements', []);
+  var sessions = filterByPeriod(allSessions, 'date');
+  var measurements = filterByPeriod(allMeasurements, 'date');
   var container = document.getElementById('pageHistory');
 
   var html = '';
+
+  // ── PERIODEFILTER ──
+  var btnStyle = function(id) {
+    var active = _historyFilter === id;
+    return 'padding:6px 14px;border-radius:20px;border:1.5px solid ' +
+      (active ? 'var(--primary)' : 'var(--border)') + ';background:' +
+      (active ? 'var(--primary)' : 'transparent') + ';color:' +
+      (active ? 'white' : 'var(--text)') + ';font-size:13px;font-weight:' +
+      (active ? '600' : '500') + ';cursor:pointer';
+  };
+  html += '<div class="card" style="padding:12px 16px">';
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
+  html += '<button onclick="setHistoryFilter(\'4w\')" style="' + btnStyle('4w') + '">4 weken</button>';
+  html += '<button onclick="setHistoryFilter(\'8w\')" style="' + btnStyle('8w') + '">8 weken</button>';
+  html += '<button onclick="setHistoryFilter(\'all\')" style="' + btnStyle('all') + '">Alles</button>';
+  html += '<button onclick="setHistoryFilter(\'custom\')" style="' + btnStyle('custom') + '">Periode</button>';
+  html += '</div>';
+  if (_historyFilter === 'custom') {
+    html += '<div style="display:flex;gap:8px;margin-top:10px;align-items:center">';
+    html += '<input type="date" id="filterFrom" value="' + _historyFrom + '" onchange="setHistoryCustomRange()" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--card);color:var(--text)">';
+    html += '<span style="color:var(--text-light)">t/m</span>';
+    html += '<input type="date" id="filterTo" value="' + _historyTo + '" onchange="setHistoryCustomRange()" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--card);color:var(--text)">';
+    html += '</div>';
+  }
+  if (_historyFilter !== 'all') {
+    html += '<div style="font-size:11px;color:var(--text-light);margin-top:6px">' + sessions.length + ' trainingen in deze periode</div>';
+  }
+  html += '</div>';
 
   // ── STREAK & STATS SUMMARY ──
   html += '<div class="card">';
   html += '<div class="card-header"><span class="icon">\uD83D\uDCC8</span> Overzicht</div>';
   html += '<div class="stats-grid">';
-  html += '<div class="stat-box"><div class="stat-num">' + sessions.length + '</div><div class="stat-label">Trainingen totaal</div></div>';
-  var streak = calcStreak(sessions);
+  html += '<div class="stat-box"><div class="stat-num">' + sessions.length + '</div><div class="stat-label">Trainingen' + (_historyFilter !== 'all' ? '' : ' totaal') + '</div></div>';
+  var streak = calcStreak(allSessions);
   html += '<div class="stat-box"><div class="stat-num">' + streak + '</div><div class="stat-label">Weken op rij</div></div>';
-  var thisWeekCount = countThisWeek(sessions);
+  var thisWeekCount = countThisWeek(allSessions);
   var weekScheduleCount = getWeekTrainingCount();
   html += '<div class="stat-box"><div class="stat-num">' + thisWeekCount + '/' + weekScheduleCount + '</div><div class="stat-label">Deze week gedaan</div></div>';
   var avgEnergy = calcAvgEnergy(sessions);
@@ -2110,12 +2185,6 @@ function renderHistory() {
       html += '<div class="chart-container" ><canvas id="waistHipChart"></canvas></div>';
     }
 
-    var mDiff = (latestM.weight - firstM.weight).toFixed(1);
-    var mDiffStr = parseFloat(mDiff) > 0 ? '+' + mDiff : mDiff;
-    if (measurements.length >= 2) {
-      html += '<div style="font-size:12px;padding:4px 16px 4px;color:var(--text-light)">' + mDiffStr + ' kg sinds start (' + firstM.date + ')</div>';
-    }
-
     var extras = [];
     if (latestM.waist) extras.push('Taille: ' + latestM.waist + ' cm');
     if (latestM.hip) extras.push('Heup: ' + latestM.hip + ' cm');
@@ -2152,11 +2221,12 @@ function renderHistory() {
   }
   html += '</div>';
 
-  var lastMeasDate = measurements.length > 0 ? measurements[measurements.length - 1].date : null;
+  // Use allMeasurements for reminders (not filtered)
+  var lastMeasDate = allMeasurements.length > 0 ? allMeasurements[allMeasurements.length - 1].date : null;
   var daysSinceWeight = lastMeasDate ? Math.floor((new Date() - new Date(lastMeasDate)) / 86400000) : 999;
   var lastBodyMeas = null;
-  for (var bi = measurements.length - 1; bi >= 0; bi--) {
-    if (measurements[bi].waist || measurements[bi].hip) { lastBodyMeas = measurements[bi]; break; }
+  for (var bi = allMeasurements.length - 1; bi >= 0; bi--) {
+    if (allMeasurements[bi].waist || allMeasurements[bi].hip) { lastBodyMeas = allMeasurements[bi]; break; }
   }
   var daysSinceBody = lastBodyMeas ? Math.floor((new Date() - new Date(lastBodyMeas.date)) / 86400000) : 999;
   var showBodyFields = daysSinceBody >= 30 || !lastBodyMeas;
@@ -2164,14 +2234,14 @@ function renderHistory() {
   if (lastMeasDate) {
     var lastD = new Date(lastMeasDate);
     var dateStr = lastD.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' });
-    html += '<div style="padding:6px 16px;font-size:12px;color:var(--text-light)">Laatste weging: ' + dateStr + ' (' + daysSinceWeight + ' dag' + (daysSinceWeight !== 1 ? 'en' : '') + ' geleden)</div>';
-    if (lastBodyMeas && lastBodyMeas.date !== lastMeasDate) {
+    html += '<table style="font-size:12px;color:var(--text-light);margin:4px 16px 8px;border-collapse:collapse">';
+    html += '<tr><td style="padding:3px 12px 3px 0;white-space:nowrap">Laatste weging</td><td style="padding:3px 0">' + dateStr + ' <span style="opacity:0.7">(' + daysSinceWeight + ' dag' + (daysSinceWeight !== 1 ? 'en' : '') + ' geleden)</span></td></tr>';
+    if (lastBodyMeas) {
       var bodyD = new Date(lastBodyMeas.date);
       var bodyDateStr = bodyD.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' });
-      html += '<div style="padding:0 16px 4px;font-size:12px;color:var(--text-light)">Laatste taille/heup: ' + bodyDateStr + '</div>';
-    } else if (lastBodyMeas) {
-      html += '<div style="padding:0 16px 4px;font-size:12px;color:var(--text-light)">Laatste taille/heup: ' + dateStr + '</div>';
+      html += '<tr><td style="padding:3px 12px 3px 0;white-space:nowrap">Laatste taille/heup</td><td style="padding:3px 0">' + bodyDateStr + '</td></tr>';
     }
+    html += '</table>';
   }
 
   if (daysSinceWeight >= 7 || measurements.length === 0) {
