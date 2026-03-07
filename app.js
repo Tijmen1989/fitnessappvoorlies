@@ -2452,6 +2452,14 @@ function renderProfile() {
   html += '<button class="save-btn" onclick="cacheAllVideos()" id="cacheVideosBtn">\u2B07 Video\'s downloaden</button>';
   html += '</div></div>';
 
+  // ── DATA RESETTEN ──
+  html += '<div class="card" style="margin-top:24px">';
+  html += '<div class="card-header"><span class="icon">\u26A0\uFE0F</span> Gevarenzone</div>';
+  html += '<div style="padding:12px 16px">';
+  html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:12px">Verwijder alle trainingsdata en begin opnieuw. Dit kan niet ongedaan worden gemaakt!</p>';
+  html += '<button onclick="confirmResetAllData()" style="background:#E74C3C;color:white;border:none;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;width:100%">\uD83D\uDDD1\uFE0F Alle data wissen</button>';
+  html += '</div></div>';
+
   container.innerHTML = html;
 }
 
@@ -2722,62 +2730,72 @@ function createProgressCharts(sessions, measurements, weightGoal) {
         return (s.feedback.calfPain !== null && s.feedback.calfPain !== undefined) ? s.feedback.calfPain : null;
       });
 
+      // Converteer kuitpijn naar zelfde schaal (0-3 → 1-4) voor single axis
+      var painScaled = painData.map(function(v) { return v !== null ? v + 1 : null; });
+
       _chartInstances.push(new Chart(epCanvas, {
-        type: 'bar',
+        type: 'line',
         data: {
           labels: epLabels,
           datasets: [
             {
               label: 'Energie',
-              type: 'line',
               data: energyData,
               borderColor: '#27AE60',
-              backgroundColor: 'rgba(39,174,96,0.1)',
+              backgroundColor: 'transparent',
               borderWidth: 2.5,
-              fill: true,
-              tension: 0.35,
-              pointRadius: 4,
+              fill: false,
+              tension: 0.3,
+              pointRadius: isMobile ? 3 : 4,
               pointBackgroundColor: '#27AE60',
               pointBorderColor: isDark ? '#222' : '#fff',
-              pointBorderWidth: 2,
-              yAxisID: 'y'
+              pointBorderWidth: 1.5
             },
             {
               label: 'Kuitpijn',
-              data: painData,
-              backgroundColor: function(ctx) {
+              data: painScaled,
+              borderColor: '#E67E22',
+              backgroundColor: 'rgba(230,126,34,0.08)',
+              borderWidth: 2,
+              borderDash: [4, 3],
+              fill: true,
+              tension: 0.3,
+              pointRadius: isMobile ? 3 : 4,
+              pointBackgroundColor: function(ctx) {
                 var val = ctx.raw;
-                if (val === 0) return 'rgba(39,174,96,0.5)';
-                if (val === 1) return 'rgba(243,156,18,0.6)';
-                if (val === 2) return 'rgba(230,126,34,0.7)';
-                return 'rgba(231,76,60,0.8)';
+                if (!val || val <= 1) return '#27AE60';
+                if (val === 2) return '#F39C12';
+                if (val === 3) return '#E67E22';
+                return '#E74C3C';
               },
-              borderRadius: 4,
-              barPercentage: 0.6,
-              yAxisID: 'y1'
+              pointBorderColor: isDark ? '#222' : '#fff',
+              pointBorderWidth: 1.5,
+              pointStyle: 'triangle'
             }
           ]
         },
         options: {
           responsive: true,
-          maintainAspectRatio: false,
           aspectRatio: isMobile ? 1.3 : 2,
-          interaction: { mode: 'index' },
+          interaction: { mode: 'index', intersect: false },
           plugins: {
-            legend: { display: true, position: 'bottom', labels: { color: textColor, padding: 16, usePointStyle: true, boxWidth: isMobile ? 8 : 12, font: { size: chartFontSize } } },
+            legend: { display: true, position: 'bottom', labels: { color: textColor, padding: 14, usePointStyle: true, boxWidth: isMobile ? 8 : 12, font: { size: chartFontSize } } },
             tooltip: Object.assign({}, defaultTooltip, {
               callbacks: {
                 label: function(ctx) {
                   if (ctx.dataset.label === 'Energie') return 'Energie: ' + ctx.parsed.y + '/5';
-                  var labels = ['Geen', 'Beetje', 'Best wel', 'Veel'];
-                  return 'Kuitpijn: ' + (labels[ctx.parsed.y] || ctx.parsed.y);
+                  var painLabels = ['', 'Geen', 'Beetje', 'Best wel', 'Veel'];
+                  return 'Kuitpijn: ' + (painLabels[ctx.parsed.y] || ctx.parsed.y);
                 }
               }
             })
           },
           scales: {
-            y: { type: 'linear', position: 'left', min: 1, max: 5, title: { display: true, text: 'Energie', color: '#27AE60', font: { size: 11, weight: '600' } }, ticks: { stepSize: 1, color: textColor, font: { size: chartFontSize } }, grid: { color: gridColor } },
-            y1: { type: 'linear', position: 'right', min: 0, max: 3, title: { display: true, text: 'Kuitpijn', color: '#E74C3C', font: { size: 11, weight: '600' } }, ticks: { stepSize: 1, color: textColor, font: { size: chartFontSize }, callback: function(v) { return ['Geen', 'Beetje', 'Best wel', 'Veel'][v] || v; } }, grid: { display: false } },
+            y: {
+              min: 0, max: 5,
+              ticks: { stepSize: 1, color: textColor, font: { size: chartFontSize }, callback: function(v) { var l = ['', '\u2014', '', '\u2B50', '', '\uD83D\uDCAA']; return l[v] || v; } },
+              grid: { color: gridColor }
+            },
             x: { ticks: { color: textColor, font: { size: chartFontSize }, maxRotation: 45, maxTicksLimit: chartTicksLimit }, grid: { display: false } }
           }
         }
@@ -3209,6 +3227,26 @@ function deleteSession(idx) {
   sessions.splice(idx, 1);
   setStore('sessions', sessions);
   renderHistory();
+}
+
+function confirmResetAllData() {
+  if (!confirm('Weet je ZEKER dat je alle data wilt wissen?\n\nAlle trainingen, metingen en instellingen worden verwijderd.\nDit kan NIET ongedaan worden gemaakt!')) return;
+  if (!confirm('Laatste kans: echt ALLES verwijderen?')) return;
+
+  // Verwijder alle lt_ keys uit localStorage
+  var keysToRemove = [];
+  for (var i = 0; i < localStorage.length; i++) {
+    var key = localStorage.key(i);
+    if (key && key.startsWith('lt_')) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach(function(k) {
+    localStorage.removeItem(k);
+  });
+
+  alert('Alle data is gewist. De app wordt herladen.');
+  location.reload();
 }
 
 function toggleWeekGroup(weekKey) {

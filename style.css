@@ -164,7 +164,7 @@ body {
 .ex-expand { color: var(--text-light); font-size: 18px; cursor: pointer; padding: 4px; transition: transform 0.2s; }
 .ex-expand.open { transform: rotate(180deg); }
 
-.ex-extra { display: none; margin-top: 12px; margin-left: 40px; }
+.ex-extra { display: none; margin-top: 12px; margin-left: 0; padding: 0 4px; }
 .ex-extra.show { display: block; }
 
 .ex-tip {
@@ -186,6 +186,9 @@ body {
   border-radius: 10px;
   padding: 14px;
   margin-bottom: 10px;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
 }
 .instr-goal {
   font-size: 13px;
@@ -221,10 +224,13 @@ body {
 }
 .exercise-video {
   width: 100%;
-  max-width: 100%;
+  max-width: 480px;
   border-radius: 12px;
   margin-bottom: 10px;
   background: transparent;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 .exercise-video-container {
   text-align: center;
