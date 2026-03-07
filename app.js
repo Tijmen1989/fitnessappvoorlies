@@ -2034,8 +2034,8 @@ function renderHistory() {
     html += '<div class="card">';
     html += '<div class="card-header"><span class="icon">\uD83D\uDCAA</span> Krachtprogressie</div>';
 
-    // Summary table per exercise — compact aligned layout
-    html += '<div style="padding:4px 16px 8px">';
+    // Summary table per exercise — tabular aligned layout
+    html += '<table style="width:100%;border-collapse:collapse;padding:4px 16px 8px;font-size:13px">';
     exerciseKeys.forEach(function(exId) {
       var ex = getExercise(exId);
       if (!ex) return;
@@ -2046,13 +2046,13 @@ function renderHistory() {
       var diff = latest.weight - first.weight;
       var diffStr = diff > 0 ? '+' + diff : (diff < 0 ? '' + diff : '\u00B10');
       var diffColor = diff > 0 ? 'var(--success)' : (diff < 0 ? '#E74C3C' : 'var(--text-light)');
-      html += '<div style="display:flex;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--border);gap:8px">';
-      html += '<span style="font-size:13px;font-weight:500;min-width:0;flex-shrink:1">' + ex.name + '</span>';
-      html += '<span style="font-size:13px;font-weight:700;white-space:nowrap">' + latest.weight + ' kg</span>';
-      html += '<span style="font-size:11px;color:' + diffColor + ';font-weight:600;white-space:nowrap">(' + diffStr + ')</span>';
-      html += '</div>';
+      html += '<tr style="border-bottom:1px solid var(--border)">';
+      html += '<td style="padding:6px 16px 6px 16px;font-weight:500">' + ex.name + '</td>';
+      html += '<td style="padding:6px 4px;font-weight:700;text-align:right;white-space:nowrap">' + latest.weight + ' kg</td>';
+      html += '<td style="padding:6px 16px 6px 8px;font-weight:600;color:' + diffColor + ';font-size:11px;white-space:nowrap">(' + diffStr + ')</td>';
+      html += '</tr>';
     });
-    html += '</div>';
+    html += '</table>';
 
     html += '<div class="chart-container" ><canvas id="strengthChart"></canvas></div>';
     html += '</div>';
@@ -2131,11 +2131,11 @@ function renderHistory() {
         var details = m.weight + ' kg';
         if (m.waist) details += ' \u00b7 T: ' + m.waist + ' cm';
         if (m.hip) details += ' \u00b7 H: ' + m.hip + ' cm';
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">';
-        html += '<div><strong>' + formatDateNL(d) + '</strong> \u2014 ' + details + '</div>';
-        html += '<div style="display:flex;gap:6px">';
-        html += '<button onclick="editMeasurement(' + idx + ')" style="background:none;border:none;color:var(--primary-light);font-size:16px;cursor:pointer;padding:2px 6px" title="Bewerken">\u270F\uFE0F</button>';
-        html += '<button onclick="deleteMeasurement(' + idx + ')" style="background:none;border:none;color:#e74c3c;font-size:16px;cursor:pointer;padding:2px 6px" title="Verwijderen">\uD83D\uDDD1\uFE0F</button>';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">';
+        html += '<div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><strong>' + formatDateNL(d) + '</strong> \u2014 ' + details + '</div>';
+        html += '<div style="display:flex;gap:4px;flex-shrink:0">';
+        html += '<button onclick="editMeasurement(' + idx + ')" style="background:none;border:none;color:var(--primary-light);font-size:14px;cursor:pointer;padding:4px 6px" title="Bewerken">\u270F\uFE0F</button>';
+        html += '<button onclick="deleteMeasurement(' + idx + ')" style="background:none;border:none;color:var(--text-light);font-size:14px;cursor:pointer;padding:4px 6px;opacity:0.5" title="Verwijderen">\uD83D\uDDD1\uFE0F</button>';
         html += '</div></div>';
       });
       html += '</div></div>';
@@ -2263,14 +2263,13 @@ function renderHistory() {
           if (s.feedback.calfPain !== null && s.feedback.calfPain !== undefined && s.feedback.calfPain > 0) feedbackStr += '\uD83E\uDDB5' + s.feedback.calfPain + '/3';
         }
 
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(0,0,0,0.03);font-size:13px">';
-        html += '<div style="flex:1">';
-        html += '<span style="color:var(--text-light);font-weight:500">' + dayName + ' ' + dayNum + ' ' + monthStr + '</span> ';
-        html += '<span>' + typeStr + '</span> ';
-        if (weightStr) html += '<span style="color:var(--text-light)">' + weightStr + '</span> ';
-        if (feedbackStr) html += '<span>' + feedbackStr + '</span>';
-        html += '</div>';
-        html += '<button onclick="deleteSession(' + sIdx + ')" style="background:none;border:none;color:#e74c3c;font-size:12px;cursor:pointer;padding:2px 4px;opacity:0.5" title="Verwijderen">\uD83D\uDDD1\uFE0F</button>';
+        html += '<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;gap:6px">';
+        html += '<span style="color:var(--text-light);white-space:nowrap;min-width:60px">' + dayName + ' ' + dayNum + ' ' + monthStr + '</span>';
+        html += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + typeStr;
+        if (weightStr) html += ' <span style="color:var(--text-light)">' + weightStr + '</span>';
+        html += '</span>';
+        if (feedbackStr) html += '<span style="white-space:nowrap">' + feedbackStr + '</span>';
+        html += '<button onclick="deleteSession(' + sIdx + ')" style="background:none;border:none;color:var(--text-light);font-size:11px;cursor:pointer;padding:2px 4px;opacity:0.3" title="Verwijderen">\u00D7</button>';
         html += '</div>';
       });
 
@@ -2365,7 +2364,7 @@ function renderProfile() {
   // ── CLOUD SYNC & KOPPELCODE ──
   html += '<div class="card">';
   html += '<div class="card-header"><span class="icon">\u2601\uFE0F</span> Cloud & Multi-device</div>';
-  html += '<div style="padding:12px 16px">';
+  html += '<div style="padding:14px 16px">';
   if (typeof getCloudSyncStatus === 'function') {
     var syncStatus = getCloudSyncStatus();
     if (syncStatus.enabled) {
@@ -2435,11 +2434,11 @@ function renderProfile() {
   // ── EXPORT / IMPORT ──
   html += '<div class="card">';
   html += '<div class="card-header"><span class="icon">\uD83D\uDCBE</span> Data beheer</div>';
-  html += '<div style="padding:12px 16px">';
+  html += '<div style="padding:14px 16px">';
   html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:12px">Exporteer al je trainingsdata als JSON-bestand. Handig als extra back-up of om naar een ander apparaat te verplaatsen.</p>';
   html += '<div style="display:flex;gap:10px;flex-wrap:wrap">';
   html += '<button class="save-btn" onclick="exportData()" style="flex:1;min-width:120px">\u2B07 Exporteren</button>';
-  html += '<button class="save-btn" onclick="triggerImport()" style="flex:1;min-width:120px;background:var(--text-light)">\u2B06 Importeren</button>';
+  html += '<button class="save-btn" onclick="triggerImport()" style="flex:1;min-width:120px;background:var(--border);color:var(--text)">\u2B06 Importeren</button>';
   html += '</div>';
   html += '<input type="file" id="importFileInput" accept=".json" style="display:none" onchange="importData(this)">';
   html += '</div></div>';
@@ -2447,7 +2446,7 @@ function renderProfile() {
   // ── OFFLINE VIDEO'S ──
   html += '<div class="card">';
   html += '<div class="card-header"><span class="icon">\uD83C\uDFA5</span> Offline video\'s</div>';
-  html += '<div style="padding:12px 16px">';
+  html += '<div style="padding:14px 16px">';
   html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:12px">Download alle oefenvideo\'s zodat ze ook zonder internet werken.</p>';
   html += '<div id="videoCacheProgress"></div>';
   html += '<button class="save-btn" onclick="cacheAllVideos()" id="cacheVideosBtn">\u2B07 Video\'s downloaden</button>';
@@ -2456,7 +2455,7 @@ function renderProfile() {
   // ── DATA RESETTEN ──
   html += '<div class="card" style="margin-top:24px">';
   html += '<div class="card-header"><span class="icon">\u26A0\uFE0F</span> Gevarenzone</div>';
-  html += '<div style="padding:12px 16px">';
+  html += '<div style="padding:14px 16px">';
   html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:12px">Verwijder alle trainingsdata en begin opnieuw. Dit kan niet ongedaan worden gemaakt!</p>';
   html += '<button onclick="confirmResetAllData()" style="background:#E74C3C;color:white;border:none;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;width:100%">\uD83D\uDDD1\uFE0F Alle data wissen</button>';
   html += '</div></div>';
