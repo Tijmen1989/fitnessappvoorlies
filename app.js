@@ -2034,8 +2034,8 @@ function renderHistory() {
     html += '<div class="card">';
     html += '<div class="card-header"><span class="icon">\uD83D\uDCAA</span> Krachtprogressie</div>';
 
-    // Summary table per exercise
-    html += '<div style="padding:0 16px 8px">';
+    // Summary table per exercise — compact aligned layout
+    html += '<div style="padding:4px 16px 8px">';
     exerciseKeys.forEach(function(exId) {
       var ex = getExercise(exId);
       if (!ex) return;
@@ -2044,11 +2044,12 @@ function renderHistory() {
       var latest = history[history.length - 1];
       var first = history[0];
       var diff = latest.weight - first.weight;
-      var diffStr = diff > 0 ? '+' + diff + ' kg' : (diff < 0 ? diff + ' kg' : 'gelijk');
+      var diffStr = diff > 0 ? '+' + diff : (diff < 0 ? '' + diff : '\u00B10');
       var diffColor = diff > 0 ? 'var(--success)' : (diff < 0 ? '#E74C3C' : 'var(--text-light)');
-      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">';
-      html += '<span style="font-size:13px;font-weight:500">' + ex.name + '</span>';
-      html += '<span style="font-size:13px;color:' + diffColor + ';font-weight:600">' + latest.weight + ' kg <span style="font-size:11px;opacity:0.8">(' + diffStr + ')</span></span>';
+      html += '<div style="display:flex;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--border);gap:8px">';
+      html += '<span style="font-size:13px;font-weight:500;min-width:0;flex-shrink:1">' + ex.name + '</span>';
+      html += '<span style="font-size:13px;font-weight:700;white-space:nowrap">' + latest.weight + ' kg</span>';
+      html += '<span style="font-size:11px;color:' + diffColor + ';font-weight:600;white-space:nowrap">(' + diffStr + ')</span>';
       html += '</div>';
     });
     html += '</div>';
