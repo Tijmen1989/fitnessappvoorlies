@@ -1,7 +1,7 @@
 // ================================================================
 // APP VERSION
 // ================================================================
-var APP_VERSION = '2.1.0';
+var APP_VERSION = '2.1.1';
 
 // ================================================================
 // STORAGE HELPERS
@@ -257,8 +257,40 @@ function getSmartRestDayTip(dayOfWeek, isCycling) {
 // ================================================================
 function renderVideoHtml(ex) {
   if (!ex.videoUrl) return '';
-  return '<div class="exercise-video-container"><video class="exercise-video" src="' + ex.videoUrl + '" autoplay loop muted playsinline onerror="this.parentElement.style.display=\'none\'"></video></div>';
+  return '<div class="exercise-video-container">' +
+    '<video class="exercise-video" src="' + ex.videoUrl + '" loop muted playsinline preload="none" ' +
+    'onerror="this.parentElement.style.display=\'none\'" ' +
+    'onloadeddata="this.classList.add(\'loaded\');this.play().catch(function(){})">' +
+    '</video></div>';
 }
+
+// Lazy-load videos only when their container becomes visible
+function initVideoObserver() {
+  if (!('IntersectionObserver' in window)) return;
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        var video = entry.target;
+        if (video.preload === 'none') {
+          video.preload = 'metadata';
+          video.load();
+          // Timeout: hide container if video doesn't load within 8s
+          setTimeout(function() {
+            if (video.readyState === 0 && video.parentElement) {
+              video.parentElement.style.display = 'none';
+            }
+          }, 8000);
+        }
+        observer.unobserve(video);
+      }
+    });
+  }, { rootMargin: '200px' });
+
+  document.querySelectorAll('video.exercise-video').forEach(function(v) {
+    observer.observe(v);
+  });
+}
+
 
 // ================================================================
 // EXERCISE HISTORY & PROGRESSION
@@ -715,6 +747,7 @@ function renderTrainingStep() {
 
   body.innerHTML = html;
   document.getElementById('tmHeader').querySelector('h2').textContent = currentTraining.name;
+  initVideoObserver();
 }
 
 function renderWarmupScreen() {
@@ -835,7 +868,10 @@ function finishCooldown() {
 
 function toggleTmInstruction() {
   var box = document.getElementById('tmInstructionBox');
-  if (box) box.classList.toggle('show');
+  if (box) {
+    box.classList.toggle('show');
+    initVideoObserver();
+  }
 }
 
 function startPlankTimer(seconds) {
@@ -1671,6 +1707,7 @@ function renderToday() {
   } else {
     renderCardioOverview(content, training, trainingKey, motivHtml);
   }
+  initVideoObserver();
 }
 
 function renderRestDay(container, dayOfWeek, motivHtml) {
@@ -1726,7 +1763,7 @@ function renderRestDay(container, dayOfWeek, motivHtml) {
     html += '</div>';
     html += '<div id="stretchDetail_' + s.id + '" style="display:none;padding:4px 12px 8px 36px">';
     if (s.videoUrl) {
-      html += '<div style="margin-bottom:4px"><video class="exercise-video" src="' + s.videoUrl + '" autoplay loop muted playsinline onerror="this.parentElement.style.display=\'none\'"></video></div>';
+      html += '<div style="margin-bottom:4px"><video class="exercise-video" src="' + s.videoUrl + '" loop muted playsinline preload="none" onerror="this.parentElement.style.display=\'none\'" onloadeddata="this.classList.add(\'loaded\');this.play().catch(function(){})"></video></div>';
     }
     html += '<p style="font-size:12px;color:var(--text-light);line-height:1.4;margin:0">' + s.instruction + '</p>';
     html += '</div>';
@@ -1821,7 +1858,10 @@ function renderKrachtOverview(container, training, trainingKey, todayKey, motivH
 
 function toggleOverviewInstruction(exId) {
   var el = document.getElementById('overview-instr-' + exId);
-  if (el) el.classList.toggle('show');
+  if (el) {
+    el.classList.toggle('show');
+    initVideoObserver();
+  }
 }
 
 function isCardioPhase2() {
@@ -1970,7 +2010,10 @@ function toggleStretchRoutineCompact() {
 
 function toggleStretchDetail(id) {
   var el = document.getElementById('stretchDetail_' + id);
-  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  if (el) {
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    initVideoObserver();
+  }
 }
 
 var stretchTimerInterval = null;
@@ -2029,7 +2072,7 @@ function runStretchStep() {
   html += '<div style="font-size:13px;color:var(--success);margin-bottom:12px">\u2714\uFE0F ' + s.focus + '</div>';
 
   if (s.videoUrl) {
-    html += '<div style="margin:0 0 12px"><video class="exercise-video" src="' + s.videoUrl + '" autoplay loop muted playsinline onerror="this.parentElement.style.display=\'none\'"></video></div>';
+    html += '<div style="margin:0 0 12px"><video class="exercise-video" src="' + s.videoUrl + '" loop muted playsinline preload="none" onerror="this.parentElement.style.display=\'none\'" onloadeddata="this.classList.add(\'loaded\');this.play().catch(function(){})"></video></div>';
   }
 
   html += '<div class="tm-timer" id="stretchTimerDisplay" style="font-size:56px">' + s.duur + '</div>';
@@ -2037,6 +2080,7 @@ function runStretchStep() {
   html += '<button class="tm-btn tm-btn-outline tm-btn-small" onclick="skipStretchStep()">Overslaan</button>';
   html += '</div>';
   body.innerHTML = html;
+  initVideoObserver();
 }
 
 function startStretchCountdown(seconds) {
@@ -3979,6 +4023,7 @@ function openDayPreview(trainingKey, dateStr, dayLabel) {
 
   overlay.classList.add('active');
   document.getElementById('bottomNav').style.display = 'none';
+  initVideoObserver();
 }
 
 function closeDayPreview() {
@@ -4078,7 +4123,10 @@ function renderCardioPreview(container, training, trainingKey) {
 
 function togglePreviewInstruction(exId) {
   var el = document.getElementById('preview-instr-' + exId);
-  if (el) el.classList.toggle('show');
+  if (el) {
+    el.classList.toggle('show');
+    initVideoObserver();
+  }
 }
 
 function getMonday(refDate, weeksAhead) {
