@@ -2000,13 +2000,15 @@ function renderHistory() {
   html += '<div class="card">';
   html += '<div class="card-header"><span class="icon">\uD83D\uDCC8</span> Overzicht</div>';
   html += '<div class="stats-grid">';
-  html += '<div class="stat-box"><div class="stat-num">' + sessions.length + '</div><div class="stat-label">Trainingen</div></div>';
+  html += '<div class="stat-box"><div class="stat-num">' + sessions.length + '</div><div class="stat-label">Trainingen totaal</div></div>';
   var streak = calcStreak(sessions);
   html += '<div class="stat-box"><div class="stat-num">' + streak + '</div><div class="stat-label">Weken op rij</div></div>';
   var thisWeekCount = countThisWeek(sessions);
-  html += '<div class="stat-box"><div class="stat-num">' + thisWeekCount + '</div><div class="stat-label">Deze week</div></div>';
+  var weekScheduleCount = getWeekTrainingCount();
+  html += '<div class="stat-box"><div class="stat-num">' + thisWeekCount + '/' + weekScheduleCount + '</div><div class="stat-label">Deze week gedaan</div></div>';
   var avgEnergy = calcAvgEnergy(sessions);
-  html += '<div class="stat-box"><div class="stat-num">' + (avgEnergy > 0 ? avgEnergy.toFixed(1) : '-') + '</div><div class="stat-label">Gem. energie</div></div>';
+  var energyPeriod = calcAvgEnergyPeriod(sessions);
+  html += '<div class="stat-box"><div class="stat-num">' + (avgEnergy > 0 ? avgEnergy.toFixed(1) : '-') + '/5</div><div class="stat-label">Gem. energie (' + energyPeriod + ')</div></div>';
   html += '</div></div>';
 
   // ── WEIGHT TREND CHART ──
@@ -2171,8 +2173,6 @@ function renderHistory() {
     html += '<div style="padding:8px 16px;background:rgba(39,174,96,0.06);border-left:3px solid var(--success);margin:0 0 4px;font-size:13px;color:var(--text)">';
     html += '\uD83D\uDCC5 ' + (measurements.length === 0 ? 'Tip: weeg jezelf 1x per week.' : 'Het is weer tijd om je te wegen!');
     html += '</div>';
-  } else {
-    html += '<div style="padding:4px 16px;font-size:12px;color:var(--text-light)">Weeg max 1x per week \u2014 dagelijks wegen geeft onnodig stress.</div>';
   }
 
   if (showBodyFields) {
@@ -2230,7 +2230,7 @@ function renderHistory() {
     weekKeys.forEach(function(wk, wkIdx) {
       var group = weekGroups[wk];
       var isRecentWeek = lastTwoWeeks.indexOf(wk) >= 0;
-      var isExpanded = isRecentWeek || showAllWeeks;
+      var isExpanded = showAllWeeks;
       var sessionCount = group.sessions.length;
 
       html += '<div style="border-bottom:1px solid var(--border);padding:12px 16px">';
@@ -2778,6 +2778,7 @@ function createProgressCharts(sessions, measurements, weightGoal) {
           responsive: true,
           aspectRatio: isMobile ? 1.3 : 2,
           interaction: { mode: 'index', intersect: false },
+          layout: { padding: { top: 6 } },
           plugins: {
             legend: { display: true, position: 'bottom', labels: { color: textColor, padding: 14, usePointStyle: true, boxWidth: isMobile ? 8 : 12, font: { size: chartFontSize } } },
             tooltip: Object.assign({}, defaultTooltip, {
@@ -2792,8 +2793,8 @@ function createProgressCharts(sessions, measurements, weightGoal) {
           },
           scales: {
             y: {
-              min: 0, max: 5,
-              ticks: { stepSize: 1, color: textColor, font: { size: chartFontSize }, callback: function(v) { var l = ['', '\u2014', '', '\u2B50', '', '\uD83D\uDCAA']; return l[v] || v; } },
+              min: 0, max: 5.5,
+              ticks: { stepSize: 1, color: textColor, font: { size: chartFontSize }, callback: function(v) { if (v > 5) return ''; var l = ['', '\u2014', '', '\u2B50', '', '\uD83D\uDCAA']; return l[v] || v; } },
               grid: { color: gridColor }
             },
             x: { ticks: { color: textColor, font: { size: chartFontSize }, maxRotation: 45, maxTicksLimit: chartTicksLimit }, grid: { display: false } }
@@ -3038,6 +3039,26 @@ function setupReminders() {
       }, 2000);
     }
   }
+
+  // ── WEEGHERINNERING ──
+  var measurements = getStore('measurements', []);
+  var lastMeasDate = measurements.length > 0 ? measurements[measurements.length - 1].date : null;
+  var daysSinceWeigh = lastMeasDate ? Math.floor((new Date() - new Date(lastMeasDate)) / 86400000) : 999;
+  var lastWeighReminder = getStore('lastWeighReminderDate', '');
+  if (daysSinceWeigh >= 7 && lastWeighReminder !== todayKey) {
+    setTimeout(function() {
+      try {
+        new Notification('Trainingsschema Lisanne', {
+          body: daysSinceWeigh >= 14
+            ? '\u2696\uFE0F Al ' + daysSinceWeigh + ' dagen niet gewogen \u2014 even op de weegschaal?'
+            : '\u2696\uFE0F Tijd om jezelf te wegen! Ga naar Voortgang.',
+          icon: './manifest.json',
+          tag: 'weigh-reminder'
+        });
+        setStore('lastWeighReminderDate', todayKey);
+      } catch(e) {}
+    }, 4000);
+  }
 }
 
 function toggleReminders() {
@@ -3135,6 +3156,27 @@ function calcAvgEnergy(sessions) {
   if (energySessions.length === 0) return 0;
   var sum = energySessions.reduce(function(t, s) { return t + s.feedback.energy; }, 0);
   return sum / energySessions.length;
+}
+
+function calcAvgEnergyPeriod(sessions) {
+  var energySessions = sessions.filter(function(s) { return s.feedback && s.feedback.energy; });
+  if (energySessions.length === 0) return 'geen data';
+  if (energySessions.length <= 4) return energySessions.length + ' sessies';
+  var first = new Date(energySessions[0].date);
+  var last = new Date(energySessions[energySessions.length - 1].date);
+  var weeks = Math.round((last - first) / (7 * 86400000));
+  return weeks <= 1 ? energySessions.length + ' sessies' : weeks + ' weken';
+}
+
+function getWeekTrainingCount() {
+  var dayOfWeek = new Date().getDay();
+  var weekType = getWeekType();
+  var schedule = getSchedule(weekType);
+  var count = 0;
+  for (var d = 0; d < 7; d++) {
+    if (schedule[d] && schedule[d] !== 'rust') count++;
+  }
+  return count;
 }
 
 function buildExerciseHistory(sessions) {

@@ -1017,6 +1017,7 @@ input[type="number"], input[type="text"], textarea, select {
 .chart-container {
   position: relative;
   padding: 8px 4px 12px;
+  overflow: hidden;
 }
 .chart-container canvas {
   width: 100% !important;
