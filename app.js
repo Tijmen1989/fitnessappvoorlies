@@ -1,7 +1,7 @@
 // ================================================================
 // APP VERSION
 // ================================================================
-var APP_VERSION = '1.9.0';
+var APP_VERSION = '2.0.0';
 
 // ================================================================
 // STORAGE HELPERS
@@ -297,15 +297,91 @@ function setWeightStep(exerciseId, step) {
   setStore('weightSteps', custom);
 }
 
+function parseRepRange(repsStr) {
+  var str = (repsStr || '10').replace(/[^\d\u2013\-]/g, '');
+  var parts = str.split(/[\u2013\-]/);
+  var min = parseInt(parts[0]) || 8;
+  var max = parts.length > 1 ? (parseInt(parts[1]) || min) : min;
+  return { min: min, max: max };
+}
+
+function getSmartWeightOptions(exerciseId, currentWeight, step) {
+  var options = [];
+  currentWeight = parseFloat(currentWeight) || 0;
+
+  if (currentWeight === 0) {
+    // No history yet — show common starting weights
+    var starts = [5, 7.5, 10, 12.5, 15, 20];
+    for (var si = 0; si < starts.length; si++) {
+      options.push({ value: starts[si], isSuggestion: false });
+    }
+    return options;
+  }
+
+  // Show: 2 steps below, current, 1 step above (suggestion)
+  var below2 = Math.max(0, currentWeight - step * 2);
+  var below1 = Math.max(0, currentWeight - step);
+  var above1 = currentWeight + step;
+
+  // Avoid duplicates and zero
+  var vals = [];
+  if (below2 > 0 && below2 !== below1) vals.push({ value: below2, isSuggestion: false });
+  if (below1 > 0 && below1 !== currentWeight) vals.push({ value: below1, isSuggestion: false });
+  vals.push({ value: currentWeight, isSuggestion: false });
+  vals.push({ value: above1, isSuggestion: true });
+
+  return vals;
+}
+
+function selectWeight(value, btn) {
+  document.getElementById('tmWeight').value = value;
+  var picker = document.getElementById('tmWeightPicker');
+  var buttons = picker.querySelectorAll('button');
+  for (var i = 0; i < buttons.length; i++) {
+    var bw = parseFloat(buttons[i].getAttribute('data-weight'));
+    if (bw === value) {
+      buttons[i].style.background = 'var(--primary)';
+      buttons[i].style.color = 'white';
+      buttons[i].style.borderColor = 'var(--primary)';
+      buttons[i].style.borderStyle = 'solid';
+    } else {
+      var isSug = bw > (value - 0.01); // rough check — suggestion is higher
+      // Re-check: is this the suggestion button?
+      var origSug = buttons[i].getAttribute('data-weight') == document.getElementById('tmWeight').value;
+      buttons[i].style.background = 'var(--card)';
+      buttons[i].style.color = 'var(--text)';
+      buttons[i].style.borderColor = 'var(--border)';
+      buttons[i].style.borderStyle = 'solid';
+    }
+  }
+}
+
+function selectReps(value, btn) {
+  document.getElementById('tmReps').value = value;
+  var picker = document.getElementById('tmRepsPicker');
+  var buttons = picker.querySelectorAll('button');
+  for (var i = 0; i < buttons.length; i++) {
+    var br = parseInt(buttons[i].getAttribute('data-reps'));
+    if (br === value) {
+      buttons[i].style.background = 'var(--primary)';
+      buttons[i].style.color = 'white';
+      buttons[i].style.borderColor = 'var(--primary)';
+    } else {
+      buttons[i].style.background = 'var(--card)';
+      buttons[i].style.color = 'var(--text)';
+      buttons[i].style.borderColor = 'var(--border)';
+    }
+  }
+}
+
 function getProgressionSuggestion(exerciseId) {
   var exerciseDef = getExercise(exerciseId);
   if (!exerciseDef) return null;
 
   // Parse rep range from exercise definition (e.g. "10-12" → min=10, max=12)
-  var repStr = (exerciseDef.reps || '10').replace(/[^\d\u2013\-]/g, '');
-  var repParts = repStr.split(/[\u2013\-]/);
-  var minReps = parseInt(repParts[0]) || 8;
-  var maxReps = repParts.length > 1 ? (parseInt(repParts[1]) || minReps) : minReps;
+  var repRange = parseRepRange(exerciseDef.reps);
+  var minReps = repRange.min;
+  var maxReps = repRange.max;
   var numSets = 3;
 
   // Get last session data with full sets info
@@ -541,13 +617,48 @@ function renderTrainingStep() {
   }
 
   if (!ex.isPlank) {
-    var defaultWeight = (sessionExerciseLog[logKey] && sessionExerciseLog[logKey].weight) || prevWeight || '';
-    var defaultReps = (sessionExerciseLog[logKey] && sessionExerciseLog[logKey].reps) || ex.defaultReps || '';
-    html += '<div class="tm-inputs">';
-    html += '<div class="tm-input-group"><label>Gewicht (kg)</label>';
-    html += '<input class="tm-input" type="number" step="0.5" id="tmWeight" value="' + defaultWeight + '"></div>';
-    html += '<div class="tm-input-group"><label>Herhalingen</label>';
-    html += '<input class="tm-input" type="number" id="tmReps" value="' + defaultReps + '"></div>';
+    var defaultWeight = (sessionExerciseLog[logKey] && sessionExerciseLog[logKey].weight) || prevWeight || 0;
+    var defaultReps = (sessionExerciseLog[logKey] && sessionExerciseLog[logKey].reps) || ex.defaultReps || 10;
+    var step = getWeightStep(exId);
+    var weightOptions = getSmartWeightOptions(exId, defaultWeight, step);
+    var repRange = parseRepRange(ex.reps);
+
+    // Weight picker
+    html += '<div style="margin-bottom:16px;width:100%;max-width:340px">';
+    html += '<div style="font-size:12px;color:var(--text-light);margin-bottom:6px;text-align:center">Gewicht (kg)</div>';
+    html += '<div id="tmWeightPicker" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center">';
+    for (var wi = 0; wi < weightOptions.length; wi++) {
+      var wo = weightOptions[wi];
+      var isSelected = wo.value === defaultWeight;
+      var isSuggestion = wo.isSuggestion;
+      var btnStyle = isSelected
+        ? 'background:var(--primary);color:white;border-color:var(--primary)'
+        : isSuggestion
+          ? 'background:var(--hint-bg);color:var(--success-text);border-color:var(--success);border-style:dashed'
+          : 'background:var(--card);color:var(--text);border-color:var(--border)';
+      html += '<button onclick="selectWeight(' + wo.value + ',this)" data-weight="' + wo.value + '" ';
+      html += 'style="min-width:52px;padding:10px 6px;border:2px solid;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;' + btnStyle + '">';
+      html += wo.value + '</button>';
+    }
+    html += '</div>';
+    html += '<input type="hidden" id="tmWeight" value="' + defaultWeight + '">';
+    html += '</div>';
+
+    // Reps picker
+    html += '<div style="margin-bottom:20px;width:100%;max-width:340px">';
+    html += '<div style="font-size:12px;color:var(--text-light);margin-bottom:6px;text-align:center">Herhalingen</div>';
+    html += '<div id="tmRepsPicker" style="display:flex;gap:6px;justify-content:center">';
+    for (var ri = repRange.min; ri <= repRange.max; ri++) {
+      var rSelected = ri === defaultReps;
+      var rStyle = rSelected
+        ? 'background:var(--primary);color:white;border-color:var(--primary)'
+        : 'background:var(--card);color:var(--text);border-color:var(--border)';
+      html += '<button onclick="selectReps(' + ri + ',this)" data-reps="' + ri + '" ';
+      html += 'style="min-width:44px;padding:10px 6px;border:2px solid;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;' + rStyle + '">';
+      html += ri + '</button>';
+    }
+    html += '</div>';
+    html += '<input type="hidden" id="tmReps" value="' + defaultReps + '">';
     html += '</div>';
   } else {
     // Plank with countdown timer
