@@ -228,7 +228,7 @@ const EXERCISE_DB = {
     isPlank: true,
     phase: 2,
     tip: 'Heupen omhoog, lichaam in rechte lijn',
-    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-bodyweight-side-plank-side.mp4',
+    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-bodyweight-elbow-side-plank-front.mp4',
     instruction: {
       goal: 'Zijwaartse buikspieren en core sterker maken.',
       steps: [
