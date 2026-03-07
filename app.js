@@ -1,7 +1,7 @@
 // ================================================================
 // APP VERSION
 // ================================================================
-var APP_VERSION = '1.5.0';
+var APP_VERSION = '1.6.0';
 
 // ================================================================
 // STORAGE HELPERS
@@ -368,8 +368,13 @@ function startTrainingMode(trainingKey) {
 }
 
 function confirmExitTraining() {
-  if (Object.keys(sessionExerciseLog).length > 0) {
-    if (!confirm('Weet je zeker dat je wilt stoppen? Je voortgang van deze sessie gaat verloren.')) return;
+  var hasData = Object.keys(sessionExerciseLog).length > 0;
+  if (hasData) {
+    if (confirm('Wil je de ' + Object.keys(sessionExerciseLog).length + ' oefeningen die je al gedaan hebt opslaan?')) {
+      exitTrainingMode(true); // save partial session
+      return;
+    }
+    if (!confirm('Weet je zeker? Dan gaat alles verloren.')) return;
   }
   exitTrainingMode(false);
 }
@@ -2338,13 +2343,30 @@ function renderHistory() {
           if (s.feedback.calfPain !== null && s.feedback.calfPain !== undefined && s.feedback.calfPain > 0) feedbackStr += '\uD83E\uDDB5' + s.feedback.calfPain + '/3';
         }
 
-        html += '<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;gap:6px">';
+        html += '<div>';
+        html += '<div onclick="toggleSessionDetail(' + sIdx + ')" style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;gap:6px;cursor:pointer">';
         html += '<span style="color:var(--text-light);white-space:nowrap;min-width:60px">' + dayName + ' ' + dayNum + ' ' + monthStr + '</span>';
         html += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + typeStr;
         if (weightStr) html += ' <span style="color:var(--text-light)">' + weightStr + '</span>';
         html += '</span>';
         if (feedbackStr) html += '<span style="white-space:nowrap">' + feedbackStr + '</span>';
-        html += '<button onclick="deleteSession(' + sIdx + ')" style="background:none;border:none;color:var(--text-light);font-size:11px;cursor:pointer;padding:2px 4px;opacity:0.3" title="Verwijderen">\u00D7</button>';
+        html += '<span style="color:var(--text-light);font-size:10px;opacity:0.4">\u25B6</span>';
+        html += '</div>';
+        html += '<div id="sessionDetail-' + sIdx + '" style="display:none;padding:6px 0 10px;border-bottom:1px solid var(--border);background:var(--bg);margin:0 -16px;padding-left:16px;padding-right:16px">';
+        if (s.exercises && s.exercises.length > 0) {
+          s.exercises.forEach(function(ex, exIdx) {
+            var exData = getExercise(ex.id);
+            var exName = exData ? exData.name : ex.id;
+            html += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px">';
+            html += '<span style="flex:1;color:var(--text)">' + exName + '</span>';
+            html += '<input type="number" step="0.5" value="' + (ex.weight || 0) + '" onchange="updateSessionWeight(' + sIdx + ',' + exIdx + ',this.value)" style="width:60px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:12px;text-align:center;background:var(--card);color:var(--text)"> kg';
+            html += '</div>';
+          });
+        }
+        html += '<div style="display:flex;justify-content:flex-end;margin-top:6px">';
+        html += '<button onclick="deleteSession(' + sIdx + ')" style="background:none;border:none;color:#E74C3C;font-size:12px;cursor:pointer;padding:4px 8px;opacity:0.6">Verwijderen</button>';
+        html += '</div>';
+        html += '</div>';
         html += '</div>';
       });
 
@@ -3453,6 +3475,28 @@ function deleteMeasurement(idx) {
 }
 
 // ── SESSIES BEHEER ──
+function toggleSessionDetail(idx) {
+  var el = document.getElementById('sessionDetail-' + idx);
+  if (!el) return;
+  var isVisible = el.style.display !== 'none';
+  el.style.display = isVisible ? 'none' : 'block';
+}
+
+function updateSessionWeight(sessionIdx, exerciseIdx, newWeight) {
+  var sessions = getStore('sessions', []);
+  if (!sessions[sessionIdx] || !sessions[sessionIdx].exercises || !sessions[sessionIdx].exercises[exerciseIdx]) return;
+  var val = parseFloat(newWeight);
+  if (isNaN(val) || val < 0) return;
+  sessions[sessionIdx].exercises[exerciseIdx].weight = val;
+  // Also update sets if they exist
+  if (sessions[sessionIdx].exercises[exerciseIdx].sets) {
+    sessions[sessionIdx].exercises[exerciseIdx].sets.forEach(function(set) {
+      set.weight = val;
+    });
+  }
+  setStore('sessions', sessions);
+}
+
 function deleteSession(idx) {
   var sessions = getStore('sessions', []);
   var s = sessions[idx];
