@@ -1,4 +1,4 @@
-var CACHE_NAME = 'training-v21';
+var CACHE_NAME = 'training-v22';
 var VIDEO_CACHE = 'training-videos-v1';
 var URLS_TO_CACHE = [
   './',

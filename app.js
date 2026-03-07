@@ -1,7 +1,7 @@
 // ================================================================
 // APP VERSION
 // ================================================================
-var APP_VERSION = '2.0.0';
+var APP_VERSION = '2.1.0';
 
 // ================================================================
 // STORAGE HELPERS
@@ -283,17 +283,33 @@ function getLastWeight(exerciseId) {
 
 function getWeightStep(exerciseId) {
   var custom = getStore('weightSteps', {});
-  if (custom[exerciseId]) return custom[exerciseId];
-  // Defaults: machines typically 2.5 or 5 kg, dumbbells 1 or 2 kg
+  if (custom[exerciseId]) {
+    // Support old format (number) and new format ({step, unit})
+    if (typeof custom[exerciseId] === 'object') return custom[exerciseId].step;
+    return custom[exerciseId];
+  }
   var ex = getExercise(exerciseId);
   if (!ex) return 2.5;
   if (ex.apparaat && ex.apparaat.indexOf('Dumbbell') >= 0) return 2;
   return 2.5;
 }
 
-function setWeightStep(exerciseId, step) {
+function getWeightUnit(exerciseId) {
   var custom = getStore('weightSteps', {});
-  custom[exerciseId] = parseFloat(step) || 2.5;
+  if (custom[exerciseId] && typeof custom[exerciseId] === 'object') return custom[exerciseId].unit || 'kg';
+  return 'kg';
+}
+
+function setWeightStep(exerciseId, step, unit) {
+  var custom = getStore('weightSteps', {});
+  custom[exerciseId] = { step: parseFloat(step) || 2.5, unit: unit || getWeightUnit(exerciseId) };
+  setStore('weightSteps', custom);
+}
+
+function setWeightUnit(exerciseId, unit) {
+  var custom = getStore('weightSteps', {});
+  var currentStep = getWeightStep(exerciseId);
+  custom[exerciseId] = { step: currentStep, unit: unit };
   setStore('weightSteps', custom);
 }
 
@@ -430,6 +446,7 @@ function getProgressionSuggestion(exerciseId) {
 
   // DOUBLE PROGRESSION LOGIC:
   var increment = getWeightStep(exerciseId);
+  var unit = getWeightUnit(exerciseId);
 
   if (consecutiveMaxSessions >= 2) {
     // Hit max reps for 2+ sessions → increase weight, drop to min reps
@@ -438,7 +455,7 @@ function getProgressionSuggestion(exerciseId) {
       current: lastWeight,
       suggested: lastWeight + increment,
       targetReps: minReps,
-      message: '\uD83D\uDCAA Verhoog naar ' + (lastWeight + increment) + ' kg \u00b7 ' + numSets + '\u00d7' + minReps
+      message: '\uD83D\uDCAA Verhoog naar ' + (lastWeight + increment) + ' ' + unit + ' \u00b7 ' + numSets + '\u00d7' + minReps
     };
   } else if (allSetsAtMax) {
     // Hit max reps once → do it again to confirm
@@ -447,7 +464,7 @@ function getProgressionSuggestion(exerciseId) {
       current: lastWeight,
       suggested: lastWeight,
       targetReps: maxReps,
-      message: '\u2705 ' + lastWeight + ' kg \u00b7 ' + numSets + '\u00d7' + maxReps + ' (nog 1x bevestigen)'
+      message: '\u2705 ' + lastWeight + ' ' + unit + ' \u00b7 ' + numSets + '\u00d7' + maxReps + ' (nog 1x bevestigen)'
     };
   } else if (lastReps < maxReps) {
     // Not at max reps yet → suggest more reps at same weight
@@ -457,7 +474,7 @@ function getProgressionSuggestion(exerciseId) {
       current: lastWeight,
       suggested: lastWeight,
       targetReps: nextReps,
-      message: lastWeight + ' kg \u00b7 probeer ' + numSets + '\u00d7' + nextReps
+      message: lastWeight + ' ' + unit + ' \u00b7 probeer ' + numSets + '\u00d7' + nextReps
     };
   }
 
@@ -610,10 +627,12 @@ function renderTrainingStep() {
   html += '<div class="tm-exercise-name">' + ex.name + '</div>';
   html += '<div class="tm-exercise-detail">' + ex.apparaat + ' \u00b7 ' + ex.reps + '</div>';
 
+  var unit = getWeightUnit(exId);
+
   if (progression) {
     html += '<div class="tm-suggestion" style="color:' + (progression.ready ? 'var(--success)' : 'var(--text-light)') + '">' + progression.message + '</div>';
   } else if (prevWeight > 0) {
-    html += '<div class="tm-prev-weight">Vorige: ' + prevWeight + ' kg</div>';
+    html += '<div class="tm-prev-weight">Vorige: ' + prevWeight + ' ' + unit + '</div>';
   }
 
   if (!ex.isPlank) {
@@ -625,7 +644,7 @@ function renderTrainingStep() {
 
     // Weight picker
     html += '<div style="margin-bottom:16px;width:100%;max-width:340px">';
-    html += '<div style="font-size:12px;color:var(--text-light);margin-bottom:6px;text-align:center">Gewicht (kg)</div>';
+    html += '<div style="font-size:12px;color:var(--text-light);margin-bottom:6px;text-align:center">Gewicht (' + unit + ')</div>';
     html += '<div id="tmWeightPicker" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center">';
     for (var wi = 0; wi < weightOptions.length; wi++) {
       var wo = weightOptions[wi];
@@ -1754,7 +1773,7 @@ function renderKrachtOverview(container, training, trainingKey, todayKey, motivH
     html += '<div class="ex-info">';
     html += '<div class="ex-name">' + ex.name + '</div>';
     html += '<div class="ex-detail">' + ex.apparaat + ' \u00b7 ' + ex.reps;
-    if (prevWeight > 0 && !progression) html += ' \u00b7 Vorige: ' + prevWeight + ' kg';
+    if (prevWeight > 0 && !progression) html += ' \u00b7 Vorige: ' + prevWeight + ' ' + getWeightUnit(exId);
     html += '</div>';
     if (progression) {
       var pColor = progression.ready ? 'var(--success)' : 'var(--text-light)';
@@ -2334,7 +2353,7 @@ function renderHistory() {
       var diffColor = diff > 0 ? 'var(--success)' : (diff < 0 ? 'var(--danger)' : 'var(--text-light)');
       html += '<tr style="border-bottom:1px solid var(--border)">';
       html += '<td style="padding:6px 16px 6px 16px;font-weight:500">' + ex.name + '</td>';
-      html += '<td style="padding:6px 4px;font-weight:700;text-align:right;white-space:nowrap">' + latest.weight + ' kg</td>';
+      html += '<td style="padding:6px 4px;font-weight:700;text-align:right;white-space:nowrap">' + latest.weight + ' ' + getWeightUnit(exId) + '</td>';
       html += '<td style="padding:6px 16px 6px 8px;font-weight:600;color:' + diffColor + ';font-size:11px;white-space:nowrap">(' + diffStr + ')</td>';
       html += '</tr>';
     });
@@ -2661,22 +2680,31 @@ function renderProfile() {
   html += '<div class="card">';
   html += '<div class="card-header"><span class="icon">\uD83C\uDFCB\uFE0F</span> Gewichtsstappen</div>';
   html += '<div style="padding:14px 16px">';
-  html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:10px">De gewichtsstap per apparaat voor progressie-adviezen. Pas aan naar jouw sportschool.</p>';
+  html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:10px">Stel de gewichtsstap en eenheid per oefening in. Pas aan naar jouw sportschool.</p>';
+  var phase = getCurrentPhase();
   var allExIds = Object.keys(typeof EXERCISE_DB !== 'undefined' ? EXERCISE_DB : {});
-  var krachtExIds = allExIds.filter(function(id) { var e = getExercise(id); return e && !e.isPlank; });
+  var krachtExIds = allExIds.filter(function(id) {
+    var e = getExercise(id);
+    if (!e || e.isPlank) return false;
+    // Alleen oefeningen van huidige fase tonen
+    if (e.phase && e.phase > phase) return false;
+    return true;
+  });
   html += '<table style="width:100%;border-collapse:collapse;font-size:13px">';
   krachtExIds.forEach(function(exId) {
     var ex = getExercise(exId);
     if (!ex) return;
     var step = getWeightStep(exId);
+    var unit = getWeightUnit(exId);
     html += '<tr style="border-bottom:1px solid var(--border)">';
-    html += '<td style="padding:8px 0">' + ex.name + '</td>';
-    html += '<td style="padding:8px 0;text-align:right;width:90px">';
-    html += '<select onchange="setWeightStep(\'' + exId + '\',this.value);renderProfile()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--card);color:var(--text)">';
-    [1, 1.25, 2, 2.5, 5].forEach(function(v) {
-      html += '<option value="' + v + '"' + (step === v ? ' selected' : '') + '>' + v + ' kg</option>';
-    });
-    html += '</select></td></tr>';
+    html += '<td style="padding:8px 0;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + ex.name + '</td>';
+    html += '<td style="padding:8px 0;text-align:right;white-space:nowrap">';
+    html += '<input type="number" step="0.25" min="0.25" value="' + step + '" onchange="setWeightStep(\'' + exId + '\',this.value)" style="width:56px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:13px;text-align:center;background:var(--card);color:var(--text)">';
+    html += ' <select onchange="setWeightUnit(\'' + exId + '\',this.value)" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--card);color:var(--text)">';
+    html += '<option value="kg"' + (unit === 'kg' ? ' selected' : '') + '>kg</option>';
+    html += '<option value="lbs"' + (unit === 'lbs' ? ' selected' : '') + '>lbs</option>';
+    html += '</select>';
+    html += '</td></tr>';
   });
   html += '</table>';
   html += '</div></div>';
@@ -3981,7 +4009,7 @@ function renderKrachtPreview(container, training, trainingKey) {
     html += '<div class="ex-info">';
     html += '<div class="ex-name">' + ex.name + '</div>';
     html += '<div class="ex-detail">' + ex.apparaat + ' \u00b7 ' + ex.reps;
-    if (prevWeight > 0 && !progression) html += ' \u00b7 Vorige: ' + prevWeight + ' kg';
+    if (prevWeight > 0 && !progression) html += ' \u00b7 Vorige: ' + prevWeight + ' ' + getWeightUnit(exId);
     html += '</div>';
     if (progression) {
       var pColor = progression.ready ? 'var(--success)' : 'var(--text-light)';

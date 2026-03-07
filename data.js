@@ -151,73 +151,7 @@ const EXERCISE_DB = {
       mistake: 'Adem inhouden. Blijf rustig doorademen. Begin met 20 seconden \u2014 dat is prima.'
     }
   },
-  // Phase 2 exercises
-  'lat-pulldown': {
-    id: 'lat-pulldown',
-    name: 'Lat pulldown',
-    apparaat: 'Lat pulldown apparaat',
-    reps: '10\u201312',
-    defaultReps: 12,
-    rest: 90,
-    phase: 2,
-    tip: 'Trek de stang naar je borst, niet achter je nek',
-    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-machine-lat-pulldown-front.mp4',
-    instruction: {
-      goal: 'Brede rugspieren (lats) en biceps trainen.',
-      steps: [
-        'Ga zitten en klem je bovenbenen onder de kussens.',
-        'Pak de brede stang vast met een brede grip.',
-        'Trek de stang langzaam naar je bovenborst.',
-        'Laat langzaam en gecontroleerd terugkomen tot je armen bijna gestrekt zijn.'
-      ],
-      focus: 'Denk eraan dat je je ellebogen naar beneden trekt, niet je handen. Schouderbladen naar elkaar toe trekken.',
-      mistake: 'De stang achter je nek trekken of te veel achterover leunen. Houd je bovenlichaam licht achterover (max 15 graden).'
-    }
-  },
-  'cable-row': {
-    id: 'cable-row',
-    name: 'Cable row (zittend)',
-    apparaat: 'Kabel-rij apparaat',
-    reps: '10\u201312',
-    defaultReps: 12,
-    rest: 90,
-    phase: 2,
-    tip: 'Rug recht, trek naar je buik toe',
-    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-machine-seated-cable-row-side.mp4',
-    instruction: {
-      goal: 'Midden van de rug en biceps trainen.',
-      steps: [
-        'Ga zitten met je voeten tegen de steun, knie\u00ebn licht gebogen.',
-        'Pak de handgreep met beide handen vast.',
-        'Trek de greep naar je buik door je ellebogen langs je lichaam te trekken.',
-        'Laat langzaam terugkomen tot je armen gestrekt zijn.'
-      ],
-      focus: 'Rug recht houden, niet naar voren of achteren zwaaien. De beweging komt uit je armen en schouderbladen.',
-      mistake: 'Te veel momentum gebruiken door naar achteren te leunen. Houd je romp stil.'
-    }
-  },
-  'leg-press': {
-    id: 'leg-press',
-    name: 'Leg press',
-    apparaat: 'Leg press apparaat',
-    reps: '10\u201312',
-    defaultReps: 12,
-    rest: 90,
-    phase: 2,
-    tip: 'Voeten op schouderbreedte, niet de knie\u00ebn op slot duwen',
-    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-machine-leg-press-side.mp4',
-    instruction: {
-      goal: 'Bovenbenen en bilspieren trainen.',
-      steps: [
-        'Ga zitten met je rug plat tegen de leuning.',
-        'Plaats je voeten op schouderbreedte op het platform.',
-        'Duw het platform weg tot je benen bijna gestrekt zijn.',
-        'Laat langzaam terugkomen tot je knie\u00ebn op 90 graden staan.'
-      ],
-      focus: 'Knie\u00ebn wijzen dezelfde kant op als je tenen. Duw door je hele voet, niet alleen je tenen.',
-      mistake: 'Knie\u00ebn helemaal op slot duwen of je onderrug van de leuning tillen. Houd altijd een kleine buiging.'
-    }
-  },
+  // Phase 2 exercise (side plank is bodyweight, no equipment needed)
   'side-plank': {
     id: 'side-plank',
     name: 'Side plank',
@@ -254,10 +188,10 @@ var PHASE_CONFIG = {
   },
   2: {
     name: 'Fase 2 \u2014 Uitbreiding',
-    description: 'Meer oefeningen en variatie',
+    description: 'Meer oefeningen en variatie + side plank',
     unlockRequirement: { sessions: 12, weeks: 4 },
-    krachtBoven: ['chest-press', 'incline-press', 'shoulder-press', 'dumbbell-row', 'lat-pulldown', 'plank', 'side-plank'],
-    krachtOnder: ['leg-curl', 'leg-ext', 'leg-press', 'cable-row', 'shoulder-press', 'plank', 'side-plank']
+    krachtBoven: ['chest-press', 'incline-press', 'shoulder-press', 'dumbbell-row', 'plank', 'side-plank'],
+    krachtOnder: ['leg-curl', 'leg-ext', 'chest-press', 'shoulder-press', 'plank', 'side-plank']
   }
 };
 
