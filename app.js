@@ -2809,8 +2809,8 @@ function createProgressCharts(sessions, measurements, weightGoal) {
           },
           scales: {
             y: {
-              min: 0, max: 5.5,
-              ticks: { stepSize: 1, color: textColor, font: { size: chartFontSize }, callback: function(v) { if (v > 5) return ''; var l = ['', '\u2014', '', '\u2B50', '', '\uD83D\uDCAA']; return l[v] || v; } },
+              min: -0.2, max: 5.8,
+              ticks: { stepSize: 1, color: textColor, font: { size: chartFontSize }, callback: function(v) { if (v < 0 || v > 5) return ''; var l = ['', '\u2014', '', '\u2B50', '', '\uD83D\uDCAA']; return l[v] || v; } },
               grid: { color: gridColor }
             },
             x: { ticks: { color: textColor, font: { size: chartFontSize }, maxRotation: 45, maxTicksLimit: chartTicksLimit }, grid: { display: false } }
