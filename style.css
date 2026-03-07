@@ -236,7 +236,7 @@ body {
   display: flex; align-items: center; justify-content: center;
   top: 1px;
 }
-.exercise-video {
+.exercise-video, .exercise-image {
   width: 100%;
   max-width: 480px;
   border-radius: 12px;
@@ -245,7 +245,7 @@ body {
   margin-left: auto;
   margin-right: auto;
 }
-.exercise-video.loaded {
+.exercise-video.loaded, .exercise-image.loaded {
   display: block;
 }
 .exercise-video-container {

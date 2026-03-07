@@ -1,5 +1,5 @@
-var CACHE_NAME = 'training-v23';
-var VIDEO_CACHE = 'training-videos-v1';
+var CACHE_NAME = 'training-v24';
+var MEDIA_CACHE = 'training-media-v1';
 var URLS_TO_CACHE = [
   './',
   './index.html',
@@ -23,7 +23,7 @@ self.addEventListener('activate', function(event) {
   event.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(
-        keys.filter(function(key) { return key !== CACHE_NAME && key !== VIDEO_CACHE; })
+        keys.filter(function(key) { return key !== CACHE_NAME && key !== MEDIA_CACHE; })
             .map(function(key) { return caches.delete(key); })
       );
     })
@@ -40,10 +40,10 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // Video requests: cache-first, then network (store on fetch)
-  if (url.indexOf('musclewiki.com') !== -1 && url.indexOf('.mp4') !== -1) {
+  // MuscleWiki media (images + videos): cache-first
+  if (url.indexOf('musclewiki.com') !== -1 && (url.indexOf('.jpg') !== -1 || url.indexOf('.mp4') !== -1)) {
     event.respondWith(
-      caches.open(VIDEO_CACHE).then(function(cache) {
+      caches.open(MEDIA_CACHE).then(function(cache) {
         return cache.match(event.request).then(function(response) {
           if (response) return response;
           return fetch(event.request).then(function(networkResponse) {
@@ -58,10 +58,9 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // App files: network-first, cache als fallback (zodat updates altijd doorkomen)
+  // App files: network-first, cache als fallback
   event.respondWith(
     fetch(event.request).then(function(response) {
-      // Update cache met de nieuwe versie
       if (response.ok) {
         var clone = response.clone();
         caches.open(CACHE_NAME).then(function(cache) {
@@ -70,17 +69,16 @@ self.addEventListener('fetch', function(event) {
       }
       return response;
     }).catch(function() {
-      // Geen internet? Gebruik cache
       return caches.match(event.request);
     })
   );
 });
 
-// Handle messages from main thread (pre-cache videos)
+// Handle messages from main thread (pre-cache images)
 self.addEventListener('message', function(event) {
   if (event.data && event.data.type === 'CACHE_VIDEOS') {
     var urls = event.data.urls;
-    caches.open(VIDEO_CACHE).then(function(cache) {
+    caches.open(MEDIA_CACHE).then(function(cache) {
       var done = 0;
       var total = urls.length;
       urls.forEach(function(url) {

@@ -253,41 +253,54 @@ function getSmartRestDayTip(dayOfWeek, isCycling) {
 }
 
 // ================================================================
-// VIDEO HELPER
+// VIDEO / IMAGE HELPER
 // ================================================================
+// MuscleWiki's video server stopped delivering mp4 data.
+// Their OG images still work. Show image first, try video in background.
+function videoUrlToImageUrl(videoUrl) {
+  if (!videoUrl) return '';
+  return videoUrl
+    .replace('/videos/branded/', '/')
+    .replace(/\.mp4$/, '.jpg')
+    .replace('/media/uploads/', '/media/uploads/og-');
+}
+
 function renderVideoHtml(ex) {
   if (!ex.videoUrl) return '';
+  var imgUrl = videoUrlToImageUrl(ex.videoUrl);
   return '<div class="exercise-video-container">' +
-    '<video class="exercise-video" src="' + ex.videoUrl + '" loop muted playsinline preload="none" ' +
-    'onerror="this.parentElement.style.display=\'none\'" ' +
-    'onloadeddata="this.classList.add(\'loaded\');this.play().catch(function(){})">' +
+    '<img class="exercise-image" src="' + imgUrl + '" alt="' + (ex.name || 'Oefening') + '" ' +
+    'loading="lazy" onerror="this.parentElement.style.display=\'none\'" ' +
+    'onload="this.classList.add(\'loaded\')">' +
+    '<video class="exercise-video" data-src="' + ex.videoUrl + '" loop muted playsinline preload="none" ' +
+    'style="display:none" ' +
+    'onerror="this.style.display=\'none\'" ' +
+    'onloadeddata="this.classList.add(\'loaded\');this.style.display=\'block\';' +
+    'var img=this.parentElement.querySelector(\'.exercise-image\');if(img)img.style.display=\'none\';' +
+    'this.play().catch(function(){})">' +
     '</video></div>';
 }
 
-// Lazy-load videos only when their container becomes visible
+// Lazy-load: try to load video in background when container is visible
 function initVideoObserver() {
   if (!('IntersectionObserver' in window)) return;
   var observer = new IntersectionObserver(function(entries) {
     entries.forEach(function(entry) {
       if (entry.isIntersecting) {
-        var video = entry.target;
-        if (video.preload === 'none') {
+        var container = entry.target;
+        var video = container.querySelector('video.exercise-video');
+        if (video && video.dataset.src && !video.src) {
+          video.src = video.dataset.src;
           video.preload = 'metadata';
           video.load();
-          // Timeout: hide container if video doesn't load within 8s
-          setTimeout(function() {
-            if (video.readyState === 0 && video.parentElement) {
-              video.parentElement.style.display = 'none';
-            }
-          }, 8000);
         }
-        observer.unobserve(video);
+        observer.unobserve(container);
       }
     });
   }, { rootMargin: '200px' });
 
-  document.querySelectorAll('video.exercise-video').forEach(function(v) {
-    observer.observe(v);
+  document.querySelectorAll('.exercise-video-container').forEach(function(c) {
+    observer.observe(c);
   });
 }
 
@@ -2837,11 +2850,11 @@ function renderProfile() {
 
   // ── OFFLINE VIDEO'S ──
   html += '<div class="card">';
-  html += '<div class="card-header"><span class="icon">\uD83C\uDFA5</span> Offline video\'s</div>';
+  html += '<div class="card-header"><span class="icon">\uD83C\uDFA5</span> Offline afbeeldingen</div>';
   html += '<div style="padding:14px 16px">';
-  html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:12px">Download alle oefenvideo\'s zodat ze ook zonder internet werken.</p>';
+  html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:12px">Download alle oefening-afbeeldingen zodat ze ook zonder internet werken.</p>';
   html += '<div id="videoCacheProgress"></div>';
-  html += '<button class="save-btn" onclick="cacheAllVideos()" id="cacheVideosBtn">\u2B07 Video\'s downloaden</button>';
+  html += '<button class="save-btn" onclick="cacheAllVideos()" id="cacheVideosBtn">\u2B07 Afbeeldingen downloaden</button>';
   html += '</div></div>';
 
   // ── AGENDA EXPORT ──
@@ -3597,12 +3610,14 @@ function toggleReminders() {
   }
 }
 
-// ── VIDEO CACHING ──
+// ── IMAGE/VIDEO CACHING ──
 function cacheAllVideos() {
   var urls = [];
   Object.keys(EXERCISE_DB).forEach(function(key) {
     var ex = EXERCISE_DB[key];
-    if (ex.videoUrl) urls.push(ex.videoUrl);
+    if (ex.videoUrl) {
+      urls.push(videoUrlToImageUrl(ex.videoUrl));
+    }
   });
 
   if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
@@ -3830,6 +3845,24 @@ function confirmResetAllData() {
     localStorage.removeItem(k);
   });
 
+  // Wis ook de cloud data in Firebase — wacht tot het klaar is vóór reload
+  if (typeof firebaseDb !== 'undefined' && firebaseDb && typeof getSyncUid === 'function') {
+    var uid = getSyncUid();
+    if (uid) {
+      firebaseDb.collection('users').doc(uid).delete().then(function() {
+        console.log('[Reset] Cloud data verwijderd');
+        alert('Alle data is gewist (lokaal + cloud). De app wordt herladen.');
+        location.reload();
+      }).catch(function(err) {
+        console.log('[Reset] Cloud data wissen mislukt:', err.message);
+        alert('Lokale data gewist. Cloud data wissen mislukt: ' + err.message + '\nDe app wordt herladen.');
+        location.reload();
+      });
+      return; // Wacht op Firebase response
+    }
+  }
+
+  // Fallback als Firebase niet beschikbaar is
   alert('Alle data is gewist. De app wordt herladen.');
   location.reload();
 }
