@@ -1,4 +1,4 @@
-var CACHE_NAME = 'training-v27';
+var CACHE_NAME = 'training-v28';
 var MEDIA_CACHE = 'training-media-v1';
 var URLS_TO_CACHE = [
   './',
@@ -40,8 +40,8 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // MuscleWiki media (images + videos): cache-first
-  if (url.indexOf('musclewiki.com') !== -1 && (url.indexOf('.jpg') !== -1 || url.indexOf('.mp4') !== -1)) {
+  // Media (local videos + MuscleWiki images/videos): cache-first
+  if ((url.indexOf('.mp4') !== -1) || (url.indexOf('musclewiki.com') !== -1 && url.indexOf('.jpg') !== -1)) {
     event.respondWith(
       caches.open(MEDIA_CACHE).then(function(cache) {
         return cache.match(event.request).then(function(response) {

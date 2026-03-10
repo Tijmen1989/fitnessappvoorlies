@@ -9,6 +9,7 @@ const EXERCISE_DB = {
     apparaat: 'Multipress \u2013 liggend',
     reps: '8\u201312',
     defaultReps: 8,
+    defaultWeight: 10,
     rest: 60,
     tip: 'Langzaam omhoog duwen, niet de armen volledig strekken',
     videoUrl: 'videos/chest-press.mp4',
@@ -31,6 +32,7 @@ const EXERCISE_DB = {
     apparaat: 'Multipress \u2013 half liggend',
     reps: '8\u201312',
     defaultReps: 8,
+    defaultWeight: 7.5,
     rest: 60,
     tip: 'Zelfde beweging als chest press, iets meer schouder-activatie',
     videoUrl: 'videos/incline-press.mp4',
@@ -53,6 +55,7 @@ const EXERCISE_DB = {
     apparaat: 'Multipress \u2013 rechtop',
     reps: '8\u201312',
     defaultReps: 8,
+    defaultWeight: 7.5,
     rest: 60,
     tip: 'Niet hoger duwen dan comfortabel, schouders laag houden',
     videoUrl: 'videos/shoulder-press.mp4',
@@ -75,6 +78,7 @@ const EXERCISE_DB = {
     apparaat: 'Dumbbell + bankje',
     reps: '8\u201312 per arm',
     defaultReps: 8,
+    defaultWeight: 6,
     rest: 60,
     tip: 'Rug recht, elleboog langs lichaam omhoog trekken',
     videoUrl: 'videos/dumbbell-row.mp4',
@@ -97,6 +101,7 @@ const EXERCISE_DB = {
     apparaat: 'Leg extension apparaat',
     reps: '8\u201312',
     defaultReps: 8,
+    defaultWeight: 15,
     rest: 60,
     tip: 'Langzaam omhoog, gecontroleerd terug laten zakken',
     videoUrl: 'videos/leg-ext.mp4',
@@ -119,6 +124,7 @@ const EXERCISE_DB = {
     apparaat: 'Leg curl apparaat',
     reps: '8\u201312',
     defaultReps: 8,
+    defaultWeight: 10,
     rest: 60,
     tip: 'Langzaam buigen, niet met een ruk',
     videoUrl: 'videos/leg-curl.mp4',
@@ -166,15 +172,15 @@ var PHASE_CONFIG = {
     name: 'Fase 1 \u2014 Basis',
     description: 'Leer de basisoefeningen goed uitvoeren',
     unlockRequirement: null,
-    krachtBoven: ['chest-press', 'incline-press', 'shoulder-press', 'dumbbell-row', 'plank'],
-    krachtOnder: ['leg-curl', 'leg-ext', 'chest-press', 'shoulder-press', 'plank']
+    krachtBoven: ['chest-press', 'shoulder-press', 'dumbbell-row', 'plank'],
+    krachtOnder: ['leg-curl', 'leg-ext', 'chest-press', 'plank']
   },
   2: {
     name: 'Fase 2 \u2014 Uitbreiding',
-    description: 'Meer oefeningen en variatie',
+    description: 'Meer oefeningen en hogere intensiteit',
     unlockRequirement: { sessions: 12, weeks: 4 },
     krachtBoven: ['chest-press', 'incline-press', 'shoulder-press', 'dumbbell-row', 'plank'],
-    krachtOnder: ['leg-curl', 'leg-ext', 'chest-press', 'shoulder-press', 'plank']
+    krachtOnder: ['leg-curl', 'leg-ext', 'chest-press', 'shoulder-press', 'dumbbell-row', 'plank']
   }
 };
 
@@ -184,7 +190,8 @@ const TRAINING_DATA = {
     name: 'Kracht: bovenlichaam',
     type: 'kracht',
     warmup: { apparaat: 'Crosstrainer', duur: '5\u20138 min', detail: 'Laag tempo, lichte weerstand' },
-    cooldown: '5 min rustig wandelen of licht stretchen (schouders, borst, rug)',
+    cooldown: '5 min rustig wandelen, daarna deze stretches:',
+    cooldownStretches: ['chest-doorway', 'rug-stretch'],
     exerciseIds: ['chest-press', 'incline-press', 'shoulder-press', 'dumbbell-row', 'plank']
   },
   krachtOnder: {
@@ -192,7 +199,8 @@ const TRAINING_DATA = {
     name: 'Kracht: onderlichaam',
     type: 'kracht',
     warmup: { apparaat: 'Loopband', duur: '5\u20138 min', detail: '5.0\u20135.5 km/u, incline 0\u20131% \u2014 rustig wandelen' },
-    cooldown: '5 min rustig wandelen of stretchen van bovenbenen + 30 sec kuiten stretchen per been',
+    cooldown: '5 min rustig wandelen, daarna deze stretches:',
+    cooldownStretches: ['hamstrings', 'quads', 'calves', 'glutes'],
     exerciseIds: ['leg-curl', 'leg-ext', 'chest-press', 'shoulder-press', 'plank']
   },
   cardioVariatie: {
@@ -324,6 +332,15 @@ function getExercise(id) {
 // ================================================================
 var STRETCH_ROUTINES = [
   {
+    id: 'hip-flexor',
+    name: 'Hip flexor stretch',
+    duur: 30,
+    perKant: true,
+    instruction: 'Ga in een uitvalspas staan (één voet ver naar voren, andere knie op de grond). Duw je heupen langzaam naar voren. Je voelt een rek aan de voorkant van je heup en bovenbeen aan de achterkant. Houd 30 seconden, wissel dan.',
+    videoUrl: '',
+    focus: 'Bovenlichaam rechtop houden, niet voorover leunen'
+  },
+  {
     id: 'hamstrings',
     name: 'Hamstrings stretch',
     duur: 30,
@@ -381,7 +398,6 @@ var STRETCH_ROUTINES = [
 
 function getSchedule(weekType) {
   var base = {
-    0: 'cardioVariatie',      // Zondag
     2: 'loopbandWandelen',    // Dinsdag
     3: 'krachtOnder',         // Woensdag
     6: 'krachtBoven'          // Zaterdag
