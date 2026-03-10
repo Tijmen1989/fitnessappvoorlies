@@ -218,23 +218,24 @@ body {
 .instr-steps li {
   counter-increment: step;
   font-size: 13px;
-  line-height: 1.5;
-  padding-left: 28px;
+  line-height: 1.6;
+  padding-left: 32px;
   position: relative;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
+  min-height: 22px;
 }
 .instr-steps li::before {
   content: counter(step);
   position: absolute;
   left: 0;
-  width: 20px; height: 20px;
+  width: 22px; height: 22px;
   background: var(--primary-light);
   color: white;
   border-radius: 50%;
   font-size: 11px;
   font-weight: 700;
   display: flex; align-items: center; justify-content: center;
-  top: 1px;
+  top: 0;
 }
 .exercise-video, .exercise-image {
   width: 100%;
@@ -383,6 +384,16 @@ video.exercise-video {
   flex-shrink: 0;
 }
 .tm-header h2 { font-size: 16px; font-weight: 600; }
+.tm-pause {
+  background: rgba(255,255,255,0.25);
+  border: none;
+  color: white;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
 .tm-close {
   background: rgba(255,255,255,0.2);
   border: none;
@@ -392,6 +403,24 @@ video.exercise-video {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+}
+.resume-banner {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark, #1565c0));
+  color: white;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  animation: pulse-border 2s infinite;
+}
+.resume-banner:active { transform: scale(0.98); }
+@keyframes pulse-border {
+  0%, 100% { box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+  50% { box-shadow: 0 4px 20px rgba(33,150,243,0.4); }
 }
 .tm-progress {
   background: rgba(255,255,255,0.1);

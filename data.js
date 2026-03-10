@@ -337,7 +337,7 @@ var STRETCH_ROUTINES = [
     duur: 30,
     perKant: true,
     instruction: 'Ga in een uitvalspas staan (één voet ver naar voren, andere knie op de grond). Duw je heupen langzaam naar voren. Je voelt een rek aan de voorkant van je heup en bovenbeen aan de achterkant. Houd 30 seconden, wissel dan.',
-    videoUrl: '',
+    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-bodyweight-hip-flexor-stretch-kneeling-lunge-3-front.mp4',
     focus: 'Bovenlichaam rechtop houden, niet voorover leunen'
   },
   {
