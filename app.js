@@ -484,7 +484,7 @@ function saveDumbbellWeights() {
   var allExIds = Object.keys(typeof EXERCISE_DB !== 'undefined' ? EXERCISE_DB : {});
   var dbIds = allExIds.filter(function(id) { return isDumbbell(id); });
   dbIds.forEach(function(id) { setAvailableWeights(id, unique.slice()); });
-  input.value = unique.join(', ');
+  input.value = unique.map(function(n) { return ('' + n).replace('.', ','); }).join(', ');
   showInlineBanner('Dumbbell-gewichten opgeslagen! (' + unique.length + ' gewichten)', 'success');
 }
 
@@ -1029,7 +1029,7 @@ function renderTrainingStep() {
             : 'background:var(--card);color:var(--text);border-color:var(--border)';
         html += '<button onclick="selectWeight(' + wo.value + ',this)" data-weight="' + wo.value + '" ';
         html += 'style="min-width:52px;padding:10px 6px;border:2px solid;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;' + btnStyle + '">';
-        html += wo.value + '</button>';
+        html += ('' + wo.value).replace('.', ',') + '</button>';
       }
       html += '</div>';
       html += '<input type="hidden" id="tmWeight" value="' + defaultWeight + '">';
@@ -3288,9 +3288,9 @@ function renderProfile() {
   html += '<p style="margin:0 0 12px"><strong style="color:var(--text)">Begin licht.</strong> Kies een gewicht waarmee je makkelijk 12 herhalingen kunt doen. Het voelt misschien te makkelijk \u2014 dat is prima.</p>';
   html += '<p style="margin:0 0 12px"><strong style="color:var(--text)">De vuistregel:</strong> na je set moet je het gevoel hebben dat je nog 3\u20134 herhalingen had kunnen doen. Kun je dat niet? Dan is het te zwaar.</p>';
   html += '<p style="margin:0 0 6px"><strong style="color:var(--text)">Typische startgewichten:</strong></p>';
-  html += '<p style="margin:0 0 4px;padding-left:6px">\u2022 Machine-oefeningen (chest press, leg ext): <strong style="color:var(--text)">10\u201320 kg</strong></p>';
-  html += '<p style="margin:0 0 4px;padding-left:6px">\u2022 Dumbbells (dumbbell row): <strong style="color:var(--text)">4\u20138 kg</strong></p>';
-  html += '<p style="margin:0 0 12px;padding-left:6px">\u2022 Shoulder press: <strong style="color:var(--text)">5\u201315 kg</strong></p>';
+  html += '<p style="margin:0 0 4px;padding-left:6px">\u2022 Machine-oefeningen (chest press, leg ext): <strong style="color:var(--text)">10\u201320 kg / 22\u201344 lbs</strong></p>';
+  html += '<p style="margin:0 0 4px;padding-left:6px">\u2022 Dumbbells (dumbbell row): <strong style="color:var(--text)">4\u20138 kg / 9\u201318 lbs</strong></p>';
+  html += '<p style="margin:0 0 12px;padding-left:6px">\u2022 Shoulder press: <strong style="color:var(--text)">5\u201315 kg / 11\u201333 lbs</strong></p>';
   html += '<p style="margin:0"><strong style="color:var(--text)">De app regelt de rest:</strong> als je 3\u00d712 haalt, zegt de app automatisch wanneer je gewicht mag verhogen.</p>';
   html += '</div></div>';
 
@@ -3336,10 +3336,10 @@ function renderProfile() {
     html += '<div class="card">';
     html += '<div class="card-header"><span class="icon">\uD83D\uDCAA</span> Beschikbare dumbbells</div>';
     html += '<div style="padding:14px 16px">';
-    html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:10px">Typ hieronder welke dumbbell-gewichten (kg) beschikbaar zijn, gescheiden door komma\u2019s. Dit geldt voor alle dumbbell-oefeningen.</p>';
+    html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:10px">Typ hieronder welke dumbbell-gewichten beschikbaar zijn, gescheiden door komma\u2019s. Decimalen met punt of komma (bijv. 2.5 of 2,5). Dit geldt voor alle dumbbell-oefeningen.</p>';
     var refId = dumbbellExIds[0];
     var avail = getAvailableWeights(refId);
-    var currentStr = avail.join(', ');
+    var currentStr = avail.map(function(n) { return ('' + n).replace('.', ','); }).join(', ');
     html += '<input type="text" id="dbWeightInput" value="' + currentStr + '" placeholder="bijv. 2, 4, 6, 8, 10, 12, 14, 16, 20" style="width:100%;padding:10px 12px;border:2px solid var(--border);border-radius:8px;font-size:14px;background:var(--card);color:var(--text);box-sizing:border-box;margin-bottom:8px">';
     html += '<button onclick="saveDumbbellWeights()" style="width:100%;padding:10px;background:var(--primary);color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">Opslaan</button>';
     html += '</div></div>';
