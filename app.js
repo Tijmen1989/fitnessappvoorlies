@@ -416,6 +416,18 @@ function getStartWeight(exerciseId) {
   return raw;
 }
 
+function showInlineBanner(msg, type) {
+  var existing = document.getElementById('inlineBanner');
+  if (existing) existing.remove();
+  var bg = type === 'success' ? 'var(--success, #4CAF50)' : type === 'warning' ? '#ff9800' : 'var(--primary)';
+  var div = document.createElement('div');
+  div.id = 'inlineBanner';
+  div.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);background:' + bg + ';color:white;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.2);text-align:center;max-width:90%;animation:fadeIn 0.2s';
+  div.textContent = msg;
+  document.body.appendChild(div);
+  setTimeout(function() { if (div.parentElement) div.remove(); }, 3000);
+}
+
 function setStartWeight(exerciseId, weight, el) {
   var custom = getStore('startWeights', {});
   custom[exerciseId] = parseFloat(weight) || 0;
@@ -507,8 +519,10 @@ function getSmartWeightOptions(exerciseId, currentWeight, step) {
 }
 
 function selectWeight(value, btn) {
-  document.getElementById('tmWeight').value = value;
+  var weightEl = document.getElementById('tmWeight');
+  if (weightEl) weightEl.value = value;
   var picker = document.getElementById('tmWeightPicker');
+  if (!picker) return;
   var buttons = picker.querySelectorAll('button');
   for (var i = 0; i < buttons.length; i++) {
     var bw = parseFloat(buttons[i].getAttribute('data-weight'));
@@ -2550,7 +2564,7 @@ function openVrijeTraining() {
 
   var options = [
     { key: 'krachtBoven', name: 'Kracht: bovenlichaam', desc: 'Chest press, shoulder press, dumbbell row, plank' },
-    { key: 'krachtOnder', name: 'Kracht: onderlichaam', desc: 'Leg curl, leg extension, chest press, plank' },
+    { key: 'krachtOnder', name: 'Kracht: onderlichaam', desc: 'Leg curl, leg extension, goblet squat, glute bridge, plank' },
     { key: 'loopbandWandelen', name: 'Loopband wandelen (35 min)', desc: 'Rustig wandelen op de loopband' },
     { key: 'cardioVariatie', name: 'Cardio variatie (40\u201345 min)', desc: 'Crosstrainer, loopband of recumbent bike' },
     { key: 'cardioLicht', name: 'Lichte cardio (30 min)', desc: 'Loopband, crosstrainer of hometrainer' },
