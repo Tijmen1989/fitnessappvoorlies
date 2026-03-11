@@ -150,7 +150,7 @@ const EXERCISE_DB = {
     defaultWeight: 6,
     rest: 60,
     tip: 'Houd de dumbbell tegen je borst, ga diep door je knie\u00ebn.',
-    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-dumbbell-goblet-squat-front.mp4',
+    videoUrl: 'videos/goblet-squat.mp4',
     youtubeId: '',
     instruction: {
       goal: 'Benen, billen en core trainen met \u00e9\u00e9n oefening.',
@@ -174,7 +174,7 @@ const EXERCISE_DB = {
     rest: 45,
     tip: 'Knijp je billen samen bovenaan, houd 1\u20132 sec vast.',
     isBodyweight: true,
-    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-bodyweight-glute-bridge-front.mp4',
+    videoUrl: 'videos/glute-bridge.mp4',
     youtubeId: '',
     instruction: {
       goal: 'Bilspieren en achterkant bovenbenen (hamstrings) versterken.',
@@ -384,7 +384,7 @@ var STRETCH_ROUTINES = [
     duur: 30,
     perKant: true,
     instruction: 'Ga in een uitvalspas staan (één voet ver naar voren, andere knie op de grond). Duw je heupen langzaam naar voren. Je voelt een rek aan de voorkant van je heup en bovenbeen aan de achterkant. Houd 30 seconden, wissel dan.',
-    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-bodyweight-hip-flexor-stretch-kneeling-lunge-3-front.mp4',
+    videoUrl: 'videos/hip-flexor.mp4',
     focus: 'Bovenlichaam rechtop houden, niet voorover leunen'
   },
   {
@@ -393,7 +393,7 @@ var STRETCH_ROUTINES = [
     duur: 30,
     perKant: true,
     instruction: 'Ga op je rug liggen bij een muur. Strek je benen omhoog tegen de muur, billen zo dicht mogelijk bij de muur. Buig \u00e9\u00e9n been, houd het andere gestrekt. Duw je dij richting de muur tot je een rek voelt. Houd 30 seconden, wissel dan.',
-    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-hamstrings-stretch-variation-1-side.mp4',
+    videoUrl: 'videos/hamstrings.mp4',
     focus: 'Billen dicht bij de muur, been gestrekt houden'
   },
   {
@@ -402,7 +402,7 @@ var STRETCH_ROUTINES = [
     duur: 30,
     perKant: true,
     instruction: 'Sta rechtop (houd je ergens aan vast voor balans). Pak je enkel vast en trek je hiel naar je billen. Je knie wijst naar de grond. Houd 30 seconden, wissel dan.',
-    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-quads-stretch-variation-1-side.mp4',
+    videoUrl: 'videos/quads.mp4',
     focus: 'Knie\u00ebn naast elkaar houden, niet naar buiten'
   },
   {
@@ -411,7 +411,7 @@ var STRETCH_ROUTINES = [
     duur: 30,
     perKant: true,
     instruction: 'Zet de bal van je voet tegen de muur, hiel blijft op de grond. Handen op schouderhoogte tegen de muur. Leun langzaam naar voren tot je een rek voelt in je kuit. Houd 30 seconden, wissel dan.',
-    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-calves-stretch-variation-1-side.mp4',
+    videoUrl: 'videos/calves.mp4',
     focus: 'Knie gestrekt houden, langzaam en gecontroleerd'
   },
   {
@@ -420,7 +420,7 @@ var STRETCH_ROUTINES = [
     duur: 30,
     perKant: true,
     instruction: 'Ga bij een muur of deuropening staan. Plaats je arm in een 90-graden hoek tegen de muur. Leun langzaam naar voren tot je een rek voelt in je borst. Houd 30 seconden, draai dan om voor de andere kant.',
-    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-chest-stretch-variation-1-side.mp4',
+    videoUrl: 'videos/chest-doorway.mp4',
     focus: 'Niet te ver doorduwen, rustig ademen'
   },
   {
@@ -429,7 +429,7 @@ var STRETCH_ROUTINES = [
     duur: 30,
     perKant: false,
     instruction: 'Ga op je buik liggen met je onderarmen plat op de grond. Duw je bovenlichaam omhoog door je ellebogen te strekken. Houd 30 seconden en kom langzaam terug.',
-    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-abdominals-stretch-variation-1-side.mp4',
+    videoUrl: 'videos/rug-stretch.mp4',
     focus: 'Schouders laag, kijk recht vooruit, niet te ver doorduwen'
   },
   {
@@ -438,7 +438,7 @@ var STRETCH_ROUTINES = [
     duur: 30,
     perKant: true,
     instruction: 'Ga op de grond zitten. Breng \u00e9\u00e9n been gebogen voor je, het andere been strek je naar achteren. Strek je arm aan dezelfde kant als je voorste been uit over de grond. Leun voorover tot je een rek voelt in je bil. Houd 30 seconden, wissel dan.',
-    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-glutes-stretch-variation-1-side.mp4',
+    videoUrl: 'videos/glutes.mp4',
     focus: 'Houd je heupen zo recht mogelijk, leun rustig voorover'
   }
 ];
