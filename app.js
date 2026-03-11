@@ -2272,6 +2272,7 @@ function renderKrachtOverview(container, training, trainingKey, todayKey, motivH
     html += '<div class="exercise-item"><div class="ex-top">';
     html += '<div class="ex-info">';
     html += '<div class="ex-name">' + ex.name + '</div>';
+    if (ex.instruction && ex.instruction.goal) html += '<div style="font-size:11px;color:var(--text-light);margin-top:1px;line-height:1.3">' + ex.instruction.goal + '</div>';
     html += '<div class="ex-detail">' + ex.apparaat + ' \u00b7 ' + ex.reps;
     if (prevWeight > 0 && !progression) html += ' \u00b7 Vorige: ' + prevWeight + ' ' + getWeightUnit(exId);
     html += '</div>';
@@ -2332,8 +2333,20 @@ function renderKrachtOverview(container, training, trainingKey, todayKey, motivH
     html += '<div class="ease-back-hint show">Het is even geleden \u2014 begin gerust iets lichter dan vorige keer.</div>';
   }
 
-  // Start button
-  html += '<button class="start-training-btn" onclick="startTrainingMode(\'' + trainingKey + '\')">Training starten \u25B6</button>';
+  // Start button — check of training vandaag al is gedaan
+  var todaySessions = getStore('sessions', []).filter(function(s) { return s.date === todayKey && s.trainingKey === trainingKey; });
+  if (todaySessions.length > 0) {
+    var ts = todaySessions[todaySessions.length - 1];
+    var exCount = ts.exercises ? ts.exercises.length : 0;
+    html += '<div style="background:var(--success-bg);border:1px solid var(--success);border-radius:12px;padding:14px 16px;margin:12px 16px;text-align:center">';
+    html += '<div style="font-size:24px;margin-bottom:4px">\u2705</div>';
+    html += '<div style="font-size:16px;font-weight:700;color:var(--success-text)">Training afgerond!</div>';
+    html += '<div style="font-size:13px;color:var(--text-light);margin-top:4px">' + exCount + ' oefeningen voltooid</div>';
+    html += '</div>';
+    html += '<button class="start-training-btn" onclick="startTrainingMode(\'' + trainingKey + '\')" style="opacity:0.6;font-size:14px">Opnieuw starten</button>';
+  } else {
+    html += '<button class="start-training-btn" onclick="startTrainingMode(\'' + trainingKey + '\')">Training starten \u25B6</button>';
+  }
 
   // Vandaag anders? section
   html += renderVandaagAnders(trainingKey);
