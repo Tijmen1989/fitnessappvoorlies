@@ -423,26 +423,23 @@ function setStartWeight(exerciseId, weight, el) {
   if (el) { el.style.borderColor = 'var(--success)'; setTimeout(function() { el.style.borderColor = ''; }, 800); }
 }
 
-function toggleDumbbellWeight(weight, btn) {
+function saveDumbbellWeights() {
+  var input = document.getElementById('dbWeightInput');
+  if (!input) return;
+  var raw = input.value;
+  var nums = raw.split(/[,;\s]+/).map(function(s) { return parseFloat(s.replace(',', '.')); }).filter(function(n) { return !isNaN(n) && n > 0; });
+  if (nums.length === 0) {
+    showInlineBanner('Voer minimaal \u00e9\u00e9n gewicht in', 'warning');
+    return;
+  }
+  nums.sort(function(a, b) { return a - b; });
+  var unique = [];
+  nums.forEach(function(n) { if (unique.indexOf(n) < 0) unique.push(n); });
   var allExIds = Object.keys(typeof EXERCISE_DB !== 'undefined' ? EXERCISE_DB : {});
   var dbIds = allExIds.filter(function(id) { return isDumbbell(id); });
-  var refId = dbIds[0] || '';
-  var avail = getAvailableWeights(refId);
-  var idx = avail.indexOf(weight);
-  if (idx >= 0) {
-    avail.splice(idx, 1);
-    if (avail.length === 0) { avail = [weight]; }
-  } else {
-    avail.push(weight);
-  }
-  avail.sort(function(a, b) { return a - b; });
-  dbIds.forEach(function(id) { setAvailableWeights(id, avail.slice()); });
-  if (btn) {
-    var isNowOn = avail.indexOf(weight) >= 0;
-    btn.style.background = isNowOn ? 'var(--primary)' : 'var(--card)';
-    btn.style.color = isNowOn ? 'white' : 'var(--text-light)';
-    btn.style.borderColor = isNowOn ? 'var(--primary)' : 'var(--border)';
-  }
+  dbIds.forEach(function(id) { setAvailableWeights(id, unique.slice()); });
+  input.value = unique.join(', ');
+  showInlineBanner('Dumbbell-gewichten opgeslagen! (' + unique.length + ' gewichten)', 'success');
 }
 
 function parseRepRange(repsStr) {
@@ -3177,19 +3174,12 @@ function renderProfile() {
     html += '<div class="card">';
     html += '<div class="card-header"><span class="icon">\uD83D\uDCAA</span> Beschikbare dumbbells</div>';
     html += '<div style="padding:14px 16px">';
-    html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:10px">Vink aan welke dumbbell-gewichten beschikbaar zijn in je sportschool. Dit geldt voor alle dumbbell-oefeningen.</p>';
+    html += '<p style="font-size:13px;color:var(--text-light);margin-bottom:10px">Typ hieronder welke dumbbell-gewichten (kg) beschikbaar zijn, gescheiden door komma\u2019s. Dit geldt voor alle dumbbell-oefeningen.</p>';
     var refId = dumbbellExIds[0];
     var avail = getAvailableWeights(refId);
-    var allDbWeights = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 18, 20, 22.5, 25, 27.5, 30, 32.5, 35, 37.5, 40];
-    html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
-    allDbWeights.forEach(function(w) {
-      var checked = avail.indexOf(w) >= 0;
-      var style = checked
-        ? 'background:var(--primary);color:white;border-color:var(--primary)'
-        : 'background:var(--card);color:var(--text-light);border-color:var(--border)';
-      html += '<button onclick="toggleDumbbellWeight(' + w + ',this)" style="min-width:44px;padding:8px 6px;border:2px solid;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;' + style + '">' + w + '</button>';
-    });
-    html += '</div>';
+    var currentStr = avail.join(', ');
+    html += '<input type="text" id="dbWeightInput" value="' + currentStr + '" placeholder="bijv. 2, 4, 6, 8, 10, 12, 14, 16, 20" style="width:100%;padding:10px 12px;border:2px solid var(--border);border-radius:8px;font-size:14px;background:var(--card);color:var(--text);box-sizing:border-box;margin-bottom:8px">';
+    html += '<button onclick="saveDumbbellWeights()" style="width:100%;padding:10px;background:var(--primary);color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">Opslaan</button>';
     html += '</div></div>';
   }
 
