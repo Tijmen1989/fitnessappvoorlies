@@ -383,7 +383,8 @@ video.exercise-video {
   justify-content: space-between;
   flex-shrink: 0;
 }
-.tm-header h2 { font-size: 16px; font-weight: 600; }
+.tm-header h2 { font-size: 16px; font-weight: 600; flex: 1; }
+.tm-header { gap: 8px; }
 .tm-pause {
   background: rgba(255,255,255,0.25);
   border: none;

@@ -235,6 +235,7 @@ const TRAINING_DATA = {
   krachtBoven: {
     id: 'kracht-boven',
     name: 'Kracht: bovenlichaam',
+    description: 'Focus op borst, schouders en rug. Core stabiliteit met plank.',
     type: 'kracht',
     warmup: { apparaat: 'Crosstrainer', duur: '5\u20138 min', detail: 'Laag tempo, lichte weerstand' },
     cooldown: '5 min rustig wandelen, daarna deze stretches:',
@@ -244,6 +245,7 @@ const TRAINING_DATA = {
   krachtOnder: {
     id: 'kracht-onder',
     name: 'Kracht: onderlichaam',
+    description: 'Focus op benen en billen. Core stabiliteit met plank.',
     type: 'kracht',
     warmup: { apparaat: 'Loopband', duur: '5\u20138 min', detail: '5.0\u20135.5 km/u, incline 0\u20131% \u2014 rustig wandelen' },
     cooldown: '5 min rustig wandelen, daarna deze stretches:',
@@ -307,11 +309,11 @@ const TRAINING_DATA = {
       },
       {
         name: 'Loopband met interval',
-        totalMin: 30,
+        totalMin: 31,
         phase2Only: true,
         phases: [
           { name: 'Warming-up', duur: 5, detail: '5.5 km/u, incline 0\u20131%', intensity: 'low' },
-          { name: 'Intervals', duur: 20, detail: 'Wissel af: 1 min stevig (6.5\u20137.0 km/u) / 2 min rustig (5.5 km/u)', intensity: 'high' },
+          { name: 'Intervals', duur: 21, detail: '7 rondes: 1 min stevig (6.5\u20137.0 km/u) + 2 min rustig (5.5 km/u)', intensity: 'high' },
           { name: 'Cooldown', duur: 5, detail: '5.0 km/u, incline 0%', intensity: 'low' }
         ],
         interval: { fast: 60, slow: 120, fastDetail: '6.5\u20137.0 km/u', slowDetail: '5.5 km/u' }
