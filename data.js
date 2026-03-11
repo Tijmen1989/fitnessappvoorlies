@@ -141,6 +141,53 @@ const EXERCISE_DB = {
       mistake: 'Met een ruk buigen of je lichaam naar voren kantelen om mee te helpen. Houd je rug tegen de leuning.'
     }
   },
+  'goblet-squat': {
+    id: 'goblet-squat',
+    name: 'Goblet squat',
+    apparaat: 'Dumbbell',
+    reps: '8\u201312',
+    defaultReps: 8,
+    defaultWeight: 6,
+    rest: 60,
+    tip: 'Houd de dumbbell tegen je borst, ga diep door je knie\u00ebn.',
+    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-dumbbell-goblet-squat-front.mp4',
+    youtubeId: '',
+    instruction: {
+      goal: 'Benen, billen en core trainen met \u00e9\u00e9n oefening.',
+      steps: [
+        'Houd een dumbbell met beide handen tegen je borst.',
+        'Voeten op schouderbreedte, tenen iets naar buiten.',
+        'Zak langzaam door je knie\u00ebn alsof je op een stoel gaat zitten.',
+        'Duw jezelf via je hielen terug omhoog.'
+      ],
+      focus: 'Knie\u00ebn in lijn met je tenen houden. Rug recht, borst vooruit. Ga zo diep als comfortabel is.',
+      mistake: 'Knie\u00ebn naar binnen laten vallen of op je tenen gaan staan. Duw bewust je knie\u00ebn naar buiten.'
+    }
+  },
+  'glute-bridge': {
+    id: 'glute-bridge',
+    name: 'Glute bridge',
+    apparaat: 'Op de grond',
+    reps: '10\u201315',
+    defaultReps: 10,
+    defaultWeight: 0,
+    rest: 45,
+    tip: 'Knijp je billen samen bovenaan, houd 1\u20132 sec vast.',
+    isBodyweight: true,
+    videoUrl: 'https://media.musclewiki.com/media/uploads/videos/branded/female-bodyweight-glute-bridge-front.mp4',
+    youtubeId: '',
+    instruction: {
+      goal: 'Bilspieren en achterkant bovenbenen (hamstrings) versterken.',
+      steps: [
+        'Ga op je rug liggen, knie\u00ebn gebogen, voeten plat op de grond.',
+        'Duw je heupen omhoog door je billen aan te spannen.',
+        'Houd bovenaan 1\u20132 seconden vast \u2014 knijp je billen samen.',
+        'Laat langzaam zakken, net niet de grond raken, en herhaal.'
+      ],
+      focus: 'De beweging komt uit je billen, niet uit je onderrug. Houd je buik aangespannen.',
+      mistake: 'Te ver doorduwen met je onderrug (holle rug). Je lichaam moet een rechte lijn vormen van schouders tot knie\u00ebn.'
+    }
+  },
   'plank': {
     id: 'plank',
     name: 'Plank',
@@ -173,14 +220,14 @@ var PHASE_CONFIG = {
     description: 'Leer de basisoefeningen goed uitvoeren',
     unlockRequirement: null,
     krachtBoven: ['chest-press', 'shoulder-press', 'dumbbell-row', 'plank'],
-    krachtOnder: ['leg-curl', 'leg-ext', 'chest-press', 'plank']
+    krachtOnder: ['leg-curl', 'leg-ext', 'goblet-squat', 'glute-bridge', 'plank']
   },
   2: {
     name: 'Fase 2 \u2014 Uitbreiding',
     description: 'Meer oefeningen en hogere intensiteit',
     unlockRequirement: { sessions: 12, weeks: 4 },
     krachtBoven: ['chest-press', 'incline-press', 'shoulder-press', 'dumbbell-row', 'plank'],
-    krachtOnder: ['leg-curl', 'leg-ext', 'chest-press', 'shoulder-press', 'dumbbell-row', 'plank']
+    krachtOnder: ['leg-curl', 'leg-ext', 'goblet-squat', 'glute-bridge', 'plank']
   }
 };
 
@@ -201,7 +248,7 @@ const TRAINING_DATA = {
     warmup: { apparaat: 'Loopband', duur: '5\u20138 min', detail: '5.0\u20135.5 km/u, incline 0\u20131% \u2014 rustig wandelen' },
     cooldown: '5 min rustig wandelen, daarna deze stretches:',
     cooldownStretches: ['hamstrings', 'quads', 'calves', 'glutes'],
-    exerciseIds: ['leg-curl', 'leg-ext', 'chest-press', 'shoulder-press', 'plank']
+    exerciseIds: ['leg-curl', 'leg-ext', 'goblet-squat', 'glute-bridge', 'plank']
   },
   cardioVariatie: {
     id: 'cardio-variatie',
