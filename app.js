@@ -532,20 +532,19 @@ function selectWeight(value, btn) {
       buttons[i].style.borderColor = 'var(--primary)';
       buttons[i].style.borderStyle = 'solid';
     } else {
-      var isSug = bw > (value - 0.01); // rough check — suggestion is higher
-      // Re-check: is this the suggestion button?
-      var origSug = buttons[i].getAttribute('data-weight') == document.getElementById('tmWeight').value;
       buttons[i].style.background = 'var(--card)';
       buttons[i].style.color = 'var(--text)';
       buttons[i].style.borderColor = 'var(--border)';
-      buttons[i].style.borderStyle = 'solid';
+      buttons[i].style.borderStyle = buttons[i].getAttribute('data-suggestion') === 'true' ? 'dashed' : 'solid';
     }
   }
 }
 
 function selectReps(value, btn) {
-  document.getElementById('tmReps').value = value;
+  var repsEl = document.getElementById('tmReps');
+  if (repsEl) repsEl.value = value;
   var picker = document.getElementById('tmRepsPicker');
+  if (!picker) return;
   var buttons = picker.querySelectorAll('button');
   for (var i = 0; i < buttons.length; i++) {
     var br = parseInt(buttons[i].getAttribute('data-reps'));
@@ -1035,8 +1034,8 @@ function renderWarmupScreen() {
 function startWarmupTimer(minutes) {
   tmState = 'warmup-timer';
   tmTimerSeconds = minutes * 60;
-  renderWarmupScreen();
   clearInterval(tmTimerInterval);
+  renderWarmupScreen();
   tmTimerInterval = setInterval(function() {
     tmTimerSeconds--;
     var display = document.getElementById('tmTimerDisplay');
@@ -1173,8 +1172,10 @@ function completeSet() {
   var logKey = ex.id + '_s' + currentSet;
 
   if (!ex.isPlank) {
-    var w = parseFloat(document.getElementById('tmWeight').value) || 0;
-    var r = parseInt(document.getElementById('tmReps').value) || ex.defaultReps;
+    var wEl = document.getElementById('tmWeight');
+    var rEl = document.getElementById('tmReps');
+    var w = wEl ? (parseFloat(wEl.value) || 0) : 0;
+    var r = rEl ? (parseInt(rEl.value) || ex.defaultReps) : ex.defaultReps;
     sessionExerciseLog[logKey] = { id: ex.id, weight: w, reps: r, done: true };
   } else {
     sessionExerciseLog[logKey] = { id: ex.id, weight: 0, reps: 0, done: true };
@@ -1742,7 +1743,7 @@ function completeCardioSession() {
   var todayKey = getTodayKey();
   var sessions = getStore('sessions', []);
   var existingIdx = -1;
-  sessions.forEach(function(s, i) { if (s.date === todayKey) existingIdx = i; });
+  sessions.forEach(function(s, i) { if (s.date === todayKey && s.type === 'cardio') existingIdx = i; });
 
   var totalMin = cardioPhases.reduce(function(t, p) { return t + p.duur; }, 0);
   var sessionData = {
@@ -2316,7 +2317,7 @@ function logManualCardio(trainingKey) {
   var todayKey = getTodayKey();
   var sessions = getStore('sessions', []);
   var existingIdx = -1;
-  sessions.forEach(function(s, i) { if (s.date === todayKey) existingIdx = i; });
+  sessions.forEach(function(s, i) { if (s.date === todayKey && s.type === 'cardio') existingIdx = i; });
 
   var sessionData = {
     date: todayKey,
@@ -4320,11 +4321,11 @@ function confirmResetAllData() {
     var uid = getSyncUid();
     if (uid) {
       firebaseDb.collection('users').doc(uid).delete().then(function() {
-        console.log('[Reset] Cloud data verwijderd');
+        // console.log('[Reset] Cloud data verwijderd');
         alert('Alle data is gewist (lokaal + cloud). De app wordt herladen.');
         location.reload();
       }).catch(function(err) {
-        console.log('[Reset] Cloud data wissen mislukt:', err.message);
+        // console.log('[Reset] Cloud data wissen mislukt:', err.message);
         alert('Lokale data gewist. Cloud data wissen mislukt: ' + err.message + '\nDe app wordt herladen.');
         location.reload();
       });
