@@ -2197,10 +2197,9 @@ function renderRestDay(container, dayOfWeek, motivHtml) {
     html += '<div class="recovery-warning">' + smartTip + '</div>';
   }
 
-  // Compacte actieknoppen
-  html += '<div style="display:flex;gap:8px;margin:8px 16px">';
-  html += '<button class="start-btn-primary" onclick="startLoopbandWandelen()" style="flex:1;margin:0;padding:10px;font-size:13px">\uD83D\uDEB6 Loopband wandelen</button>';
-  html += '<button class="start-btn-primary" onclick="startStretchTimer()" style="flex:1;margin:0;padding:10px;font-size:13px;background:var(--success);color:#fff">\uD83E\uDDD8 Start stretch timer</button>';
+  // Loopband knop
+  html += '<div style="margin:8px 16px">';
+  html += '<button class="start-btn-primary" onclick="startLoopbandWandelen()" style="width:100%;margin:0;padding:10px;font-size:13px">\uD83D\uDEB6 Loopband wandelen</button>';
   html += '</div>';
 
   // Kuit-tips op fietsdagen (compact)
