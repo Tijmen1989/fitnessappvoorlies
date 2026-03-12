@@ -747,19 +747,25 @@ function releaseWakeLock() {
   }
 }
 
-// Background timer compensation
+// Background timer compensation: corrigeer timers op basis van echte kloktijd
 var _bgHiddenAt = 0;
+var _bgTmTimerAtHide = 0;
+var _bgCardioPhaseAtHide = 0;
+var _bgIntervalLeftAtHide = 0;
 document.addEventListener('visibilitychange', function() {
   if (document.visibilityState === 'hidden') {
     _bgHiddenAt = Date.now();
+    _bgTmTimerAtHide = tmTimerSeconds;
+    _bgCardioPhaseAtHide = cardioPhaseSeconds;
+    _bgIntervalLeftAtHide = intervalSecondsLeft;
   } else if (document.visibilityState === 'visible') {
     if (trainingModeActive) requestWakeLock();
     if (_bgHiddenAt > 0) {
       var elapsed = Math.floor((Date.now() - _bgHiddenAt) / 1000);
       _bgHiddenAt = 0;
       if (elapsed > 1 && trainingModeActive) {
-        if (tmTimerSeconds > 0 && (tmState === 'warmup-timer' || tmState === 'resting' || tmState === 'plank-timer' || tmState === 'cooldown-timer')) {
-          tmTimerSeconds = Math.max(0, tmTimerSeconds - elapsed);
+        if (_bgTmTimerAtHide > 0 && (tmState === 'warmup-timer' || tmState === 'resting' || tmState === 'plank-timer' || tmState === 'cooldown-timer')) {
+          tmTimerSeconds = Math.max(0, _bgTmTimerAtHide - elapsed);
           if (tmTimerSeconds <= 0) {
             clearInterval(tmTimerInterval);
             if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
@@ -773,9 +779,9 @@ document.addEventListener('visibilitychange', function() {
             if (d) d.textContent = formatTimer(tmTimerSeconds);
           }
         }
-        if (cardioTimerActive && cardioPhaseSeconds > 0) {
-          cardioPhaseSeconds = Math.max(0, cardioPhaseSeconds - elapsed);
-          if (intervalIsAutoMode) intervalSecondsLeft = Math.max(0, intervalSecondsLeft - elapsed);
+        if (cardioTimerActive && _bgCardioPhaseAtHide > 0) {
+          cardioPhaseSeconds = Math.max(0, _bgCardioPhaseAtHide - elapsed);
+          if (intervalIsAutoMode) intervalSecondsLeft = Math.max(0, _bgIntervalLeftAtHide - elapsed);
           if (cardioPhaseSeconds <= 0) {
             advanceCardioPhase();
           } else {
@@ -836,6 +842,7 @@ function startTrainingMode(trainingKey) {
   requestWakeLock();
   document.getElementById('trainingMode').classList.add('active');
   document.getElementById('bottomNav').style.display = 'none';
+  document.body.style.overflow = 'hidden';
   renderTrainingStep();
 }
 
@@ -937,6 +944,7 @@ function resumeTraining() {
   requestWakeLock();
   document.getElementById('trainingMode').classList.add('active');
   document.getElementById('bottomNav').style.display = 'none';
+  document.body.style.overflow = 'hidden';
   renderTrainingStep();
 }
 
@@ -968,6 +976,7 @@ function exitTrainingMode(save) {
   releaseWakeLock();
   document.getElementById('trainingMode').classList.remove('active');
   document.getElementById('bottomNav').style.display = 'flex';
+  document.body.style.overflow = '';
 
   if (save) {
     saveFinalSession();
@@ -1511,6 +1520,7 @@ function formatTimer(secs) {
 function renderCompletionInTrainingMode() {
   document.getElementById('trainingMode').classList.add('active');
   document.getElementById('bottomNav').style.display = 'none';
+  document.body.style.overflow = 'hidden';
 
   var body = document.getElementById('tmBody');
   var header = document.getElementById('tmHeader').querySelector('h2');
@@ -1640,6 +1650,7 @@ function closeCompletionScreen() {
   selectedFeedback = { energy: null, calf: null };
   document.getElementById('trainingMode').classList.remove('active');
   document.getElementById('bottomNav').style.display = 'flex';
+  document.body.style.overflow = '';
   renderToday();
 }
 
@@ -1663,6 +1674,7 @@ function saveFeedbackAndStartWandelen() {
 
   // Close kracht completion and start loopband
   document.getElementById('trainingMode').classList.remove('active');
+  document.body.style.overflow = '';
   startLoopbandWandelen();
 }
 
@@ -1753,6 +1765,7 @@ function startCardioTimer(trainingKey, optionIndex) {
   requestWakeLock();
   document.getElementById('trainingMode').classList.add('active');
   document.getElementById('bottomNav').style.display = 'none';
+  document.body.style.overflow = 'hidden';
   initIntervalForPhase();
   renderCardioTimerStep();
   startCardioCountdown();
@@ -1967,6 +1980,7 @@ function stopCardioTimer() {
   releaseWakeLock();
   document.getElementById('trainingMode').classList.remove('active');
   document.getElementById('bottomNav').style.display = 'flex';
+  document.body.style.overflow = '';
   renderToday();
 }
 
