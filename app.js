@@ -529,25 +529,26 @@ function getSmartWeightOptions(exerciseId, currentWeight, step) {
     return vals;
   }
 
-  // Machine-oefeningen: gebruik stap-systeem
+  // Machine-oefeningen: breed bereik tonen
   if (currentWeight === 0) {
-    var starts = [5, 7.5, 10, 12.5, 15, 20];
-    for (var si = 0; si < starts.length; si++) {
-      options.push({ value: starts[si], isSuggestion: false });
+    for (var si = 5; si <= 70; si += step) {
+      options.push({ value: si, isSuggestion: false });
     }
     return options;
   }
 
-  var below2 = Math.max(0, currentWeight - step * 2);
-  var below1 = Math.max(0, currentWeight - step);
-  var above1 = currentWeight + step;
-
-  // Avoid duplicates and zero
   var vals = [];
-  if (below2 > 0 && below2 !== below1) vals.push({ value: below2, isSuggestion: false });
-  if (below1 > 0 && below1 !== currentWeight) vals.push({ value: below1, isSuggestion: false });
-  vals.push({ value: currentWeight, isSuggestion: false });
-  vals.push({ value: above1, isSuggestion: true });
+  for (var s = -3; s <= 3; s++) {
+    var v = currentWeight + (s * step);
+    if (v > 0) {
+      vals.push({ value: v, isSuggestion: s > 0 });
+    }
+  }
+  var hasCurrentWeight = vals.some(function(o) { return o.value === currentWeight; });
+  if (!hasCurrentWeight && currentWeight > 0) {
+    vals.push({ value: currentWeight, isSuggestion: false });
+    vals.sort(function(a, b) { return a.value - b.value; });
+  }
 
   return vals;
 }
@@ -1007,8 +1008,18 @@ function renderTrainingStep() {
   if (!ex.isPlank) {
     var suggestedWeight = progression ? progression.suggested : prevWeight;
     var suggestedReps = progression ? progression.targetReps : (ex.defaultReps || 8);
-    var defaultWeight = (sessionExerciseLog[logKey] && sessionExerciseLog[logKey].weight) || suggestedWeight || prevWeight || 0;
-    var defaultReps = (sessionExerciseLog[logKey] && sessionExerciseLog[logKey].reps) || suggestedReps || ex.defaultReps || 8;
+    // Check vorige set van dezelfde oefening in deze sessie
+    var prevSetWeight = 0, prevSetReps = 0;
+    for (var ps = currentSet - 1; ps >= 1; ps--) {
+      var prevSetKey = exId + '_s' + ps;
+      if (sessionExerciseLog[prevSetKey] && sessionExerciseLog[prevSetKey].done) {
+        prevSetWeight = sessionExerciseLog[prevSetKey].weight || 0;
+        prevSetReps = sessionExerciseLog[prevSetKey].reps || 0;
+        break;
+      }
+    }
+    var defaultWeight = (sessionExerciseLog[logKey] && sessionExerciseLog[logKey].weight) || prevSetWeight || suggestedWeight || prevWeight || 0;
+    var defaultReps = (sessionExerciseLog[logKey] && sessionExerciseLog[logKey].reps) || prevSetReps || suggestedReps || ex.defaultReps || 8;
     var step = getWeightStep(exId);
     var repRange = parseRepRange(ex.reps);
 
