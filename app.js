@@ -2191,6 +2191,103 @@ function skipTrainingToday() {
   content.innerHTML = html;
 }
 
+// ================================================================
+// SPIERPIJN CHECK — advies op basis van spierpijn-niveau
+// ================================================================
+function renderSorenessCheck(trainingKey) {
+  if (!trainingKey) return '';
+  var todayKey = getTodayKey();
+  var sorenessLog = getStore('sorenessLog', {});
+  var todayEntry = sorenessLog[todayKey];
+
+  if (todayEntry) {
+    return renderSorenessResult(todayEntry.level, trainingKey);
+  }
+
+  var html = '<div class="card" style="margin:8px 16px;padding:0">';
+  html += '<div class="card-header"><span class="icon">\uD83E\uDDB5</span>Hoe voelen je spieren?</div>';
+  html += '<div style="padding:12px 16px;font-size:13px;color:var(--text-light);line-height:1.4">Geef aan hoeveel spierpijn je hebt, dan geven we je advies voor vandaag.</div>';
+  html += '<div style="display:flex;gap:8px;padding:0 16px 14px">';
+  html += '<button onclick="setSoreness(0)" style="flex:1;padding:10px 6px;border-radius:10px;border:2px solid var(--success);background:var(--success-bg);cursor:pointer;text-align:center">';
+  html += '<div style="font-size:20px">\uD83D\uDE0A</div><div style="font-size:11px;font-weight:600;color:var(--success-text);margin-top:2px">Geen / licht</div></button>';
+  html += '<button onclick="setSoreness(1)" style="flex:1;padding:10px 6px;border-radius:10px;border:2px solid var(--warning-border, orange);background:var(--warning-bg, #fff8e1);cursor:pointer;text-align:center">';
+  html += '<div style="font-size:20px">\uD83D\uDE10</div><div style="font-size:11px;font-weight:600;color:var(--warning-text, #e65100);margin-top:2px">Matig</div></button>';
+  html += '<button onclick="setSoreness(2)" style="flex:1;padding:10px 6px;border-radius:10px;border:2px solid var(--danger, #c62828);background:var(--danger-bg, #ffebee);cursor:pointer;text-align:center">';
+  html += '<div style="font-size:20px">\uD83D\uDE16</div><div style="font-size:11px;font-weight:600;color:var(--danger-text, #c62828);margin-top:2px">Zwaar</div></button>';
+  html += '</div></div>';
+  return html;
+}
+
+function renderSorenessResult(level, trainingKey) {
+  var training = trainingKey ? TRAINING_DATA[trainingKey] : null;
+  var trainingType = training ? training.type : 'kracht';
+
+  var configs = [
+    {
+      emoji: '\uD83D\uDE0A', label: 'Geen / lichte spierpijn',
+      color: 'var(--success)', bg: 'var(--success-bg)', textColor: 'var(--success-text)',
+      advice: 'Alles goed! Train gewoon volgens schema. Je spieren zijn hersteld.',
+      action: 'full'
+    },
+    {
+      emoji: '\uD83D\uDE10', label: 'Matige spierpijn',
+      color: 'var(--warning-border, orange)', bg: 'var(--warning-bg, #fff8e1)', textColor: 'var(--warning-text, #e65100)',
+      advice: trainingType === 'kracht'
+        ? 'Je kunt trainen, maar begin 10\u201320% lichter dan normaal. Focus op goede techniek en langzame, gecontroleerde bewegingen. De spierpijn verdwijnt vaak na de warming-up.'
+        : 'Je kunt trainen, maar houd het tempo lager. Luister goed naar je lichaam.',
+      action: 'lighter'
+    },
+    {
+      emoji: '\uD83D\uDE16', label: 'Zware spierpijn',
+      color: 'var(--danger, #c62828)', bg: 'var(--danger-bg, #ffebee)', textColor: 'var(--danger-text, #c62828)',
+      advice: 'Overweeg om vandaag rust te nemen of alleen licht te wandelen. Zware spierpijn (DOMS) betekent dat je spieren nog aan het herstellen zijn. Trainen met zware pijn kan je blessurerisico verhogen en herstel vertragen.',
+      action: 'rest'
+    }
+  ];
+
+  var c = configs[level] || configs[0];
+  var html = '<div class="card" style="margin:8px 16px;padding:0">';
+  html += '<div class="card-header" style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:8px"><span class="icon">\uD83E\uDDB5</span>Spierpijn-check</div>';
+  html += '<span onclick="resetSoreness()" style="font-size:11px;color:var(--text-light);cursor:pointer;text-decoration:underline">wijzig</span></div>';
+  html += '<div style="padding:12px 16px;border-top:1px solid var(--border)">';
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+  html += '<div style="font-size:28px">' + c.emoji + '</div>';
+  html += '<div><div style="font-size:14px;font-weight:700;color:' + c.textColor + '">' + c.label + '</div>';
+
+  if (c.action === 'full') {
+    html += '<div style="font-size:12px;color:var(--success)">Volledig trainen \u2714</div>';
+  } else if (c.action === 'lighter') {
+    html += '<div style="font-size:12px;color:var(--warning-text, #e65100)">Aangepast trainen \u26A0\uFE0F</div>';
+  } else {
+    html += '<div style="font-size:12px;color:var(--danger-text, #c62828)">Rust aanbevolen \u26D4</div>';
+  }
+  html += '</div></div>';
+  html += '<div style="font-size:13px;color:var(--text);line-height:1.5;background:' + c.bg + ';border-radius:8px;padding:10px 12px;border:1px solid ' + c.color + '">' + c.advice + '</div>';
+  html += '</div></div>';
+  return html;
+}
+
+function setSoreness(level) {
+  var todayKey = getTodayKey();
+  var sorenessLog = getStore('sorenessLog', {});
+  sorenessLog[todayKey] = { level: level, timestamp: Date.now() };
+  var keys = Object.keys(sorenessLog);
+  if (keys.length > 30) {
+    keys.sort();
+    for (var i = 0; i < keys.length - 30; i++) delete sorenessLog[keys[i]];
+  }
+  setStore('sorenessLog', sorenessLog);
+  renderToday();
+}
+
+function resetSoreness() {
+  var todayKey = getTodayKey();
+  var sorenessLog = getStore('sorenessLog', {});
+  delete sorenessLog[todayKey];
+  setStore('sorenessLog', sorenessLog);
+  renderToday();
+}
+
 function renderToday() {
   var now = new Date();
   var weekType = getWeekType();
@@ -2214,7 +2311,7 @@ function renderToday() {
   if (hasPausedTraining()) {
     motivHtml += renderResumeBanner();
   }
-  motivHtml += renderWeekSummary() + renderMotivationStrip();
+  motivHtml += renderWeekSummary() + renderSorenessCheck(trainingKey) + renderMotivationStrip();
 
   if (!trainingKey) {
     renderRestDay(content, dayOfWeek, motivHtml);
