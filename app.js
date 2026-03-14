@@ -764,7 +764,7 @@ document.addEventListener('visibilitychange', function() {
       var elapsed = Math.floor((Date.now() - _bgHiddenAt) / 1000);
       _bgHiddenAt = 0;
       if (elapsed > 1 && trainingModeActive) {
-        if (_bgTmTimerAtHide > 0 && (tmState === 'warmup-timer' || tmState === 'resting' || tmState === 'plank-timer' || tmState === 'cooldown-timer')) {
+        if (_bgTmTimerAtHide > 0 && (tmState === 'warmup-timer' || tmState === 'resting' || tmState === 'plank-timer' || tmState === 'cooldown-timer' || tmState === 'cooldown-stretch-timer')) {
           tmTimerSeconds = Math.max(0, _bgTmTimerAtHide - elapsed);
           if (tmTimerSeconds <= 0) {
             clearInterval(tmTimerInterval);
@@ -774,6 +774,7 @@ document.addEventListener('visibilitychange', function() {
             else if (tmState === 'resting') { tmState = 'idle'; renderTrainingStep(); }
             else if (tmState === 'plank-timer') { tmState = 'idle'; completeSet(); }
             else if (tmState === 'cooldown-timer') { finishCooldownWalking(); }
+            else if (tmState === 'cooldown-stretch-timer') { tmState = 'idle'; advanceCooldownStretch(); }
           } else {
             var d = document.getElementById('tmTimerDisplay');
             if (d) d.textContent = formatTimer(tmTimerSeconds);
@@ -1234,6 +1235,8 @@ function getStretchById(id) {
 }
 
 var cooldownSubPhase = 'walking';
+var cooldownStretchIdx = 0;
+var cooldownStretchSide = 0;
 
 function renderCooldownScreen() {
   var body = document.getElementById('tmBody');
@@ -1261,31 +1264,46 @@ function renderCooldownScreen() {
     body.innerHTML = html;
     document.getElementById('tmHeader').querySelector('h2').textContent = 'Cooldown \u2014 Wandelen';
   } else {
-    var html = '<div class="tm-warmup-cooldown">';
-    html += '<div class="tm-phase-icon">\uD83E\uDDD8</div>';
-    html += '<div class="tm-exercise-name">Cooldown: stretches</div>';
-    html += '<div style="color:var(--text-light);font-size:15px;margin:8px 0 4px;line-height:1.5">Houd elke stretch rustig vast</div>';
-
-    if (stretchIds.length > 0) {
-      html += '<div style="text-align:left;margin:12px 0;background:var(--bg);border-radius:12px;padding:4px 0">';
-      stretchIds.forEach(function(sid, idx) {
-        var s = getStretchById(sid);
-        if (!s) return;
-        html += '<div style="padding:10px 14px;border-top:' + (idx === 0 ? 'none' : '1px solid var(--border)') + '">';
-        html += '<div style="display:flex;align-items:center;gap:8px">';
-        html += '<span style="font-size:12px;font-weight:700;color:var(--primary);min-width:18px">' + (idx + 1) + '</span>';
-        html += '<div style="flex:1"><div style="font-size:14px;font-weight:600">' + s.name + ' <span style="font-weight:400;color:var(--text-light);font-size:12px">' + s.duur + 's' + (s.perKant ? '/kant' : '') + '</span></div></div>';
-        html += '</div>';
-        html += '<div style="margin-top:6px;padding:4px 0 0 26px">';
-        if (s.videoUrl) html += '<video src="' + s.videoUrl + '" autoplay loop muted playsinline style="width:100%;max-width:180px;border-radius:8px;margin-bottom:6px"></video>';
-        html += '<p style="font-size:12px;color:var(--text-light);line-height:1.5;margin:0">' + s.instruction + '</p>';
-        if (s.focus) html += '<p style="font-size:12px;color:var(--success);line-height:1.4;margin:4px 0 0">\u2714\uFE0F ' + s.focus + '</p>';
-        html += '</div></div>';
-      });
+    // Stap-voor-stap stretches met timer
+    if (cooldownStretchIdx >= stretchIds.length) {
+      var html = '<div class="tm-warmup-cooldown">';
+      html += '<div class="tm-phase-icon">\u2705</div>';
+      html += '<div class="tm-exercise-name">Stretches klaar!</div>';
+      html += '<div style="color:var(--text-light);font-size:15px;margin:8px 0 16px">Goed gedaan. Je cooldown is compleet.</div>';
+      html += '<button class="tm-btn tm-btn-success" onclick="finishCooldown()" style="margin-top:8px">\u2705 Training afronden!</button>';
       html += '</div>';
+      body.innerHTML = html;
+      document.getElementById('tmHeader').querySelector('h2').textContent = 'Cooldown \u2014 Klaar!';
+      return;
     }
 
-    html += '<button class="tm-btn tm-btn-success" onclick="finishCooldown()" style="margin-top:16px">\u2705 Training afronden!</button>';
+    var sid = stretchIds[cooldownStretchIdx];
+    var s = getStretchById(sid);
+    if (!s) { cooldownStretchIdx++; renderCooldownScreen(); return; }
+
+    var sideLabel = '';
+    if (s.perKant) sideLabel = cooldownStretchSide === 0 ? ' (links)' : ' (rechts)';
+
+    var html = '<div class="tm-warmup-cooldown">';
+    html += '<div style="font-size:14px;color:var(--primary-light);font-weight:600;margin-bottom:8px">Stretch ' + (cooldownStretchIdx + 1) + ' / ' + stretchIds.length + sideLabel + '</div>';
+    html += '<div class="tm-exercise-name" style="font-size:22px;margin-bottom:8px">' + s.name + '</div>';
+
+    html += '<div style="font-size:13px;color:var(--text);line-height:1.5;max-width:320px;margin:0 auto 10px;padding:10px 14px;background:var(--card);border-radius:10px;text-align:left">' + s.instruction + '</div>';
+    if (s.focus) html += '<div style="font-size:12px;color:var(--success);margin-bottom:10px">\u2714\uFE0F ' + s.focus + '</div>';
+
+    if (s.videoUrl) {
+      html += '<div style="margin:0 0 12px"><video src="' + s.videoUrl + '" autoplay loop muted playsinline style="width:100%;max-width:200px;border-radius:8px"></video></div>';
+    }
+
+    if (tmState === 'cooldown-stretch-timer') {
+      html += '<div class="tm-timer cooldown" id="tmTimerDisplay" style="font-size:56px">' + tmTimerSeconds + '</div>';
+      html += '<div style="font-size:13px;color:var(--text-light);margin-bottom:12px">Houd vast en adem rustig door</div>';
+      html += '<button class="tm-btn tm-btn-outline tm-btn-small" onclick="skipCooldownStretch()">Overslaan</button>';
+    } else {
+      html += '<div class="tm-timer" style="font-size:56px;color:var(--text-light)">' + s.duur + '</div>';
+      html += '<button class="tm-btn tm-btn-accent" onclick="startCooldownStretchTimer(' + s.duur + ')">Start ' + s.duur + ' sec</button>';
+      html += '<button class="tm-btn tm-btn-outline tm-btn-small" onclick="skipCooldownStretch()" style="margin-top:6px">Overslaan</button>';
+    }
     html += '</div>';
     body.innerHTML = html;
     document.getElementById('tmHeader').querySelector('h2').textContent = 'Cooldown \u2014 Stretches';
@@ -1314,6 +1332,47 @@ function finishCooldownWalking() {
   clearInterval(tmTimerInterval);
   tmState = 'idle';
   cooldownSubPhase = 'stretches';
+  cooldownStretchIdx = 0;
+  cooldownStretchSide = 0;
+  renderCooldownScreen();
+}
+
+function startCooldownStretchTimer(seconds) {
+  tmState = 'cooldown-stretch-timer';
+  tmTimerSeconds = seconds;
+  renderCooldownScreen();
+  clearInterval(tmTimerInterval);
+  tmTimerInterval = setInterval(function() {
+    tmTimerSeconds--;
+    var display = document.getElementById('tmTimerDisplay');
+    if (display) display.textContent = tmTimerSeconds;
+    if (tmTimerSeconds <= 0) {
+      clearInterval(tmTimerInterval);
+      if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
+      playTimerSound('short');
+      tmState = 'idle';
+      advanceCooldownStretch();
+    }
+  }, 1000);
+}
+
+function skipCooldownStretch() {
+  clearInterval(tmTimerInterval);
+  tmState = 'idle';
+  advanceCooldownStretch();
+}
+
+function advanceCooldownStretch() {
+  var stretchIds = currentTraining.cooldownStretches || [];
+  if (cooldownStretchIdx < stretchIds.length) {
+    var s = getStretchById(stretchIds[cooldownStretchIdx]);
+    if (s && s.perKant && cooldownStretchSide === 0) {
+      cooldownStretchSide = 1;
+    } else {
+      cooldownStretchIdx++;
+      cooldownStretchSide = 0;
+    }
+  }
   renderCooldownScreen();
 }
 
@@ -1321,6 +1380,8 @@ function finishCooldown() {
   clearInterval(tmTimerInterval);
   tmState = 'idle';
   cooldownSubPhase = 'walking';
+  cooldownStretchIdx = 0;
+  cooldownStretchSide = 0;
   exitTrainingMode(true);
 }
 
