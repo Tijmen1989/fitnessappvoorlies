@@ -2192,85 +2192,102 @@ function skipTrainingToday() {
 }
 
 // ================================================================
-// SPIERPIJN CHECK — advies op basis van spierpijn-niveau
+// SPIERPIJN CHECK — per spiergroep, dagelijks bij te werken
 // ================================================================
+var SORENESS_GROUPS = [
+  { id: 'boven', label: 'Bovenlichaam', emoji: '\uD83D\uDCAA', detail: 'borst, schouders, rug, armen' },
+  { id: 'onder', label: 'Onderlichaam', emoji: '\uD83E\uDDB5', detail: 'benen, billen, onderrug' },
+  { id: 'core', label: 'Core / buik', emoji: '\uD83E\uDDD8', detail: 'buikspieren, zij, onderrug' }
+];
+
+var SORENESS_LEVELS = [
+  { value: 0, emoji: '\uD83D\uDE0A', label: 'Geen', color: 'var(--success)', bg: 'var(--success-bg)', textColor: 'var(--success-text)' },
+  { value: 1, emoji: '\uD83D\uDE10', label: 'Licht', color: '#66bb6a', bg: '#e8f5e9', textColor: '#2e7d32' },
+  { value: 2, emoji: '\uD83D\uDE15', label: 'Matig', color: 'var(--warning-border, orange)', bg: 'var(--warning-bg, #fff8e1)', textColor: 'var(--warning-text, #e65100)' },
+  { value: 3, emoji: '\uD83D\uDE16', label: 'Zwaar', color: 'var(--danger, #c62828)', bg: 'var(--danger-bg, #ffebee)', textColor: 'var(--danger-text, #c62828)' }
+];
+
+function getTrainingMuscleGroup(trainingKey) {
+  if (!trainingKey) return [];
+  if (trainingKey.indexOf('Boven') >= 0) return ['boven', 'core'];
+  if (trainingKey.indexOf('Onder') >= 0) return ['onder', 'core'];
+  if (trainingKey.indexOf('Compound') >= 0) return ['boven', 'onder', 'core'];
+  return ['boven', 'onder', 'core'];
+}
+
 function renderSorenessCheck(trainingKey) {
-  if (!trainingKey) return '';
   var todayKey = getTodayKey();
   var sorenessLog = getStore('sorenessLog', {});
-  var todayEntry = sorenessLog[todayKey];
-
-  if (todayEntry) {
-    return renderSorenessResult(todayEntry.level, trainingKey);
-  }
+  var todayData = sorenessLog[todayKey] || {};
 
   var html = '<div class="card" style="margin:8px 16px;padding:0">';
-  html += '<div class="card-header"><span class="icon">\uD83E\uDDB5</span>Hoe voelen je spieren?</div>';
-  html += '<div style="padding:12px 16px;font-size:13px;color:var(--text-light);line-height:1.4">Geef aan hoeveel spierpijn je hebt, dan geven we je advies voor vandaag.</div>';
-  html += '<div style="display:flex;gap:8px;padding:0 16px 14px">';
-  html += '<button onclick="setSoreness(0)" style="flex:1;padding:10px 6px;border-radius:10px;border:2px solid var(--success);background:var(--success-bg);cursor:pointer;text-align:center">';
-  html += '<div style="font-size:20px">\uD83D\uDE0A</div><div style="font-size:11px;font-weight:600;color:var(--success-text);margin-top:2px">Geen / licht</div></button>';
-  html += '<button onclick="setSoreness(1)" style="flex:1;padding:10px 6px;border-radius:10px;border:2px solid var(--warning-border, orange);background:var(--warning-bg, #fff8e1);cursor:pointer;text-align:center">';
-  html += '<div style="font-size:20px">\uD83D\uDE10</div><div style="font-size:11px;font-weight:600;color:var(--warning-text, #e65100);margin-top:2px">Matig</div></button>';
-  html += '<button onclick="setSoreness(2)" style="flex:1;padding:10px 6px;border-radius:10px;border:2px solid var(--danger, #c62828);background:var(--danger-bg, #ffebee);cursor:pointer;text-align:center">';
-  html += '<div style="font-size:20px">\uD83D\uDE16</div><div style="font-size:11px;font-weight:600;color:var(--danger-text, #c62828);margin-top:2px">Zwaar</div></button>';
-  html += '</div></div>';
-  return html;
-}
+  html += '<div class="card-header"><span class="icon">\uD83E\uDDB5</span>Hoe voelen je spieren vandaag?</div>';
 
-function renderSorenessResult(level, trainingKey) {
-  var training = trainingKey ? TRAINING_DATA[trainingKey] : null;
-  var trainingType = training ? training.type : 'kracht';
+  SORENESS_GROUPS.forEach(function(group) {
+    var currentLevel = todayData[group.id];
+    html += '<div style="padding:10px 16px;border-top:1px solid var(--border)">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
+    html += '<div><span style="font-size:16px">' + group.emoji + '</span> <strong style="font-size:13px">' + group.label + '</strong>';
+    html += '<div style="font-size:11px;color:var(--text-light)">' + group.detail + '</div></div></div>';
+    html += '<div style="display:flex;gap:6px">';
+    SORENESS_LEVELS.forEach(function(lvl) {
+      var isSelected = currentLevel === lvl.value;
+      var border = isSelected ? '2px solid ' + lvl.color : '2px solid var(--border)';
+      var bg = isSelected ? lvl.bg : 'var(--card)';
+      var fontWeight = isSelected ? '700' : '400';
+      html += '<button onclick="setSoreness(\'' + group.id + '\',' + lvl.value + ')" style="flex:1;padding:6px 2px;border-radius:8px;border:' + border + ';background:' + bg + ';cursor:pointer;text-align:center">';
+      html += '<div style="font-size:16px">' + lvl.emoji + '</div>';
+      html += '<div style="font-size:10px;font-weight:' + fontWeight + ';color:' + (isSelected ? lvl.textColor : 'var(--text-light)') + ';margin-top:1px">' + lvl.label + '</div>';
+      html += '</button>';
+    });
+    html += '</div></div>';
+  });
 
-  var configs = [
-    {
-      emoji: '\uD83D\uDE0A', label: 'Geen / lichte spierpijn',
-      color: 'var(--success)', bg: 'var(--success-bg)', textColor: 'var(--success-text)',
-      advice: 'Alles goed! Train gewoon volgens schema. Je spieren zijn hersteld.',
-      action: 'full'
-    },
-    {
-      emoji: '\uD83D\uDE10', label: 'Matige spierpijn',
-      color: 'var(--warning-border, orange)', bg: 'var(--warning-bg, #fff8e1)', textColor: 'var(--warning-text, #e65100)',
-      advice: trainingType === 'kracht'
-        ? 'Je kunt trainen, maar begin 10\u201320% lichter dan normaal. Focus op goede techniek en langzame, gecontroleerde bewegingen. De spierpijn verdwijnt vaak na de warming-up.'
-        : 'Je kunt trainen, maar houd het tempo lager. Luister goed naar je lichaam.',
-      action: 'lighter'
-    },
-    {
-      emoji: '\uD83D\uDE16', label: 'Zware spierpijn',
-      color: 'var(--danger, #c62828)', bg: 'var(--danger-bg, #ffebee)', textColor: 'var(--danger-text, #c62828)',
-      advice: 'Overweeg om vandaag rust te nemen of alleen licht te wandelen. Zware spierpijn (DOMS) betekent dat je spieren nog aan het herstellen zijn. Trainen met zware pijn kan je blessurerisico verhogen en herstel vertragen.',
-      action: 'rest'
+  if (trainingKey && Object.keys(todayData).length > 0) {
+    var advice = getSorenessAdvice(todayData, trainingKey);
+    if (advice) {
+      html += '<div style="padding:10px 16px;border-top:1px solid var(--border)">';
+      html += '<div style="font-size:13px;color:var(--text);line-height:1.5;background:' + advice.bg + ';border-radius:8px;padding:10px 12px;border:1px solid ' + advice.color + '">';
+      html += '<strong>' + advice.emoji + ' ' + advice.title + '</strong><br>' + advice.text;
+      html += '</div></div>';
     }
-  ];
-
-  var c = configs[level] || configs[0];
-  var html = '<div class="card" style="margin:8px 16px;padding:0">';
-  html += '<div class="card-header" style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:8px"><span class="icon">\uD83E\uDDB5</span>Spierpijn-check</div>';
-  html += '<span onclick="resetSoreness()" style="font-size:11px;color:var(--text-light);cursor:pointer;text-decoration:underline">wijzig</span></div>';
-  html += '<div style="padding:12px 16px;border-top:1px solid var(--border)">';
-  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
-  html += '<div style="font-size:28px">' + c.emoji + '</div>';
-  html += '<div><div style="font-size:14px;font-weight:700;color:' + c.textColor + '">' + c.label + '</div>';
-
-  if (c.action === 'full') {
-    html += '<div style="font-size:12px;color:var(--success)">Volledig trainen \u2714</div>';
-  } else if (c.action === 'lighter') {
-    html += '<div style="font-size:12px;color:var(--warning-text, #e65100)">Aangepast trainen \u26A0\uFE0F</div>';
-  } else {
-    html += '<div style="font-size:12px;color:var(--danger-text, #c62828)">Rust aanbevolen \u26D4</div>';
   }
-  html += '</div></div>';
-  html += '<div style="font-size:13px;color:var(--text);line-height:1.5;background:' + c.bg + ';border-radius:8px;padding:10px 12px;border:1px solid ' + c.color + '">' + c.advice + '</div>';
-  html += '</div></div>';
+
+  html += '</div>';
   return html;
 }
 
-function setSoreness(level) {
+function getSorenessAdvice(todayData, trainingKey) {
+  var targetGroups = getTrainingMuscleGroup(trainingKey);
+  var maxRelevant = 0;
+  var relevantPain = [];
+  targetGroups.forEach(function(gid) {
+    var level = todayData[gid];
+    if (level !== undefined && level > maxRelevant) maxRelevant = level;
+    if (level >= 2) {
+      var g = SORENESS_GROUPS.filter(function(x) { return x.id === gid; })[0];
+      if (g) relevantPain.push(g.label.toLowerCase());
+    }
+  });
+
+  if (maxRelevant === 0) {
+    return { emoji: '\u2705', title: 'Volledig trainen', text: 'Geen spierpijn in de spiergroepen die je vandaag gaat trainen. Ga ervoor!', color: 'var(--success)', bg: 'var(--success-bg)' };
+  } else if (maxRelevant === 1) {
+    return { emoji: '\u2705', title: 'Gewoon trainen', text: 'Lichte spierpijn is normaal en verdwijnt vaak na de warming-up. Train gewoon volgens schema.', color: 'var(--success)', bg: 'var(--success-bg)' };
+  } else if (maxRelevant === 2) {
+    var where = relevantPain.length > 0 ? ' (' + relevantPain.join(', ') + ')' : '';
+    return { emoji: '\u26A0\uFE0F', title: 'Aangepast trainen', text: 'Matige spierpijn' + where + '. Begin 10\u201320% lichter dan normaal en focus op goede techniek. Als de pijn na de warming-up niet afneemt, overweeg dan om lichter door te gaan.', color: 'var(--warning-border, orange)', bg: 'var(--warning-bg, #fff8e1)' };
+  } else {
+    var where2 = relevantPain.length > 0 ? ' in je ' + relevantPain.join(' en ') : '';
+    return { emoji: '\u26D4', title: 'Rust aanbevolen', text: 'Zware spierpijn' + where2 + '. Je spieren zijn nog aan het herstellen (DOMS). Overweeg vandaag alleen licht te wandelen. Trainen met zware pijn verhoogt blessurerisico en vertraagt herstel.', color: 'var(--danger, #c62828)', bg: 'var(--danger-bg, #ffebee)' };
+  }
+}
+
+function setSoreness(groupId, level) {
   var todayKey = getTodayKey();
   var sorenessLog = getStore('sorenessLog', {});
-  sorenessLog[todayKey] = { level: level, timestamp: Date.now() };
+  if (!sorenessLog[todayKey]) sorenessLog[todayKey] = {};
+  sorenessLog[todayKey][groupId] = level;
   var keys = Object.keys(sorenessLog);
   if (keys.length > 30) {
     keys.sort();
