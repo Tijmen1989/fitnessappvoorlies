@@ -2195,16 +2195,16 @@ function skipTrainingToday() {
 // SPIERPIJN CHECK — per spiergroep, dagelijks bij te werken
 // ================================================================
 var SORENESS_GROUPS = [
-  { id: 'boven', label: 'Bovenlichaam', emoji: '\uD83D\uDCAA', detail: 'borst, schouders, rug, armen' },
-  { id: 'onder', label: 'Onderlichaam', emoji: '\uD83E\uDDB5', detail: 'benen, billen, onderrug' },
-  { id: 'core', label: 'Core / buik', emoji: '\uD83E\uDDD8', detail: 'buikspieren, zij, onderrug' }
+  { id: 'boven', label: 'Armen & schouders', emoji: '\uD83D\uDCAA', question: 'Heb je last als je iets optilt of boven je hoofd reikt?' },
+  { id: 'onder', label: 'Benen & billen', emoji: '\uD83E\uDDB5', question: 'Heb je last bij traplopen of hurken?' },
+  { id: 'core', label: 'Buik & rug', emoji: '\uD83E\uDDD8', question: 'Heb je last bij bukken of draaien?' }
 ];
 
 var SORENESS_LEVELS = [
-  { value: 0, emoji: '\uD83D\uDE0A', label: 'Geen', color: 'var(--success)', bg: 'var(--success-bg)', textColor: 'var(--success-text)' },
-  { value: 1, emoji: '\uD83D\uDE10', label: 'Licht', color: '#66bb6a', bg: '#e8f5e9', textColor: '#2e7d32' },
-  { value: 2, emoji: '\uD83D\uDE15', label: 'Matig', color: 'var(--warning-border, orange)', bg: 'var(--warning-bg, #fff8e1)', textColor: 'var(--warning-text, #e65100)' },
-  { value: 3, emoji: '\uD83D\uDE16', label: 'Zwaar', color: 'var(--danger, #c62828)', bg: 'var(--danger-bg, #ffebee)', textColor: 'var(--danger-text, #c62828)' }
+  { value: 0, label: 'Nee', color: 'var(--success)', bg: 'var(--success-bg)', textColor: 'var(--success-text)' },
+  { value: 1, label: 'Beetje stijf', color: '#66bb6a', bg: '#e8f5e9', textColor: '#2e7d32' },
+  { value: 2, label: 'Best wel', color: 'var(--warning-border, orange)', bg: 'var(--warning-bg, #fff8e1)', textColor: 'var(--warning-text, #e65100)' },
+  { value: 3, label: 'Flink!', color: 'var(--danger, #c62828)', bg: 'var(--danger-bg, #ffebee)', textColor: 'var(--danger-text, #c62828)' }
 ];
 
 function getTrainingMuscleGroup(trainingKey) {
@@ -2221,23 +2221,23 @@ function renderSorenessCheck(trainingKey) {
   var todayData = sorenessLog[todayKey] || {};
 
   var html = '<div class="card" style="margin:8px 16px;padding:0">';
-  html += '<div class="card-header"><span class="icon">\uD83E\uDDB5</span>Hoe voelen je spieren vandaag?</div>';
+  html += '<div class="card-header"><span class="icon">\uD83E\uDDB5</span>Nog last van vorige training?</div>';
 
   SORENESS_GROUPS.forEach(function(group) {
     var currentLevel = todayData[group.id];
     html += '<div style="padding:10px 16px;border-top:1px solid var(--border)">';
-    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
-    html += '<div><span style="font-size:16px">' + group.emoji + '</span> <strong style="font-size:13px">' + group.label + '</strong>';
-    html += '<div style="font-size:11px;color:var(--text-light)">' + group.detail + '</div></div></div>';
+    html += '<div style="margin-bottom:6px">';
+    html += '<span style="font-size:14px">' + group.emoji + '</span> <strong style="font-size:13px">' + group.label + '</strong>';
+    html += '<div style="font-size:12px;color:var(--text-light);margin-top:1px">' + group.question + '</div>';
+    html += '</div>';
     html += '<div style="display:flex;gap:6px">';
     SORENESS_LEVELS.forEach(function(lvl) {
       var isSelected = currentLevel === lvl.value;
       var border = isSelected ? '2px solid ' + lvl.color : '2px solid var(--border)';
       var bg = isSelected ? lvl.bg : 'var(--card)';
       var fontWeight = isSelected ? '700' : '400';
-      html += '<button onclick="setSoreness(\'' + group.id + '\',' + lvl.value + ')" style="flex:1;padding:6px 2px;border-radius:8px;border:' + border + ';background:' + bg + ';cursor:pointer;text-align:center">';
-      html += '<div style="font-size:16px">' + lvl.emoji + '</div>';
-      html += '<div style="font-size:10px;font-weight:' + fontWeight + ';color:' + (isSelected ? lvl.textColor : 'var(--text-light)') + ';margin-top:1px">' + lvl.label + '</div>';
+      html += '<button onclick="setSoreness(\'' + group.id + '\',' + lvl.value + ')" style="flex:1;padding:8px 2px;border-radius:8px;border:' + border + ';background:' + bg + ';cursor:pointer;text-align:center">';
+      html += '<div style="font-size:11px;font-weight:' + fontWeight + ';color:' + (isSelected ? lvl.textColor : 'var(--text-light)') + '">' + lvl.label + '</div>';
       html += '</button>';
     });
     html += '</div></div>';
