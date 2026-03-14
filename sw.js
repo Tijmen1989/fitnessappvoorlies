@@ -1,4 +1,4 @@
-var CACHE_NAME = 'training-v52';
+var CACHE_NAME = 'training-v53';
 var MEDIA_CACHE = 'training-media-v1';
 var URLS_TO_CACHE = [
   './',
