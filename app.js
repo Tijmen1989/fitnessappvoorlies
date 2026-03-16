@@ -429,23 +429,40 @@ function setWeightUnit(exerciseId, unit, el) {
   if (el) { el.style.borderColor = 'var(--success)'; setTimeout(function() { el.style.borderColor = ''; }, 800); }
 }
 
+function snapToAvailable(exerciseId, targetWeight) {
+  var customWeights = getStore('availableWeights', {});
+  var avail = customWeights[exerciseId];
+  if (!avail || avail.length === 0) {
+    if (isDumbbell(exerciseId)) avail = DEFAULT_DUMBBELL_WEIGHTS;
+    else return targetWeight;
+  }
+  var closest = avail[0];
+  for (var i = 1; i < avail.length; i++) {
+    if (Math.abs(avail[i] - targetWeight) < Math.abs(closest - targetWeight)) closest = avail[i];
+  }
+  return closest;
+}
+
+function getNextWeightUp(exerciseId, currentWeight) {
+  var customWeights = getStore('availableWeights', {});
+  var avail = customWeights[exerciseId];
+  if (!avail || avail.length === 0) {
+    if (isDumbbell(exerciseId)) avail = DEFAULT_DUMBBELL_WEIGHTS;
+    else return currentWeight + getWeightStep(exerciseId);
+  }
+  for (var i = 0; i < avail.length; i++) {
+    if (avail[i] > currentWeight) return avail[i];
+  }
+  return currentWeight + getWeightStep(exerciseId);
+}
+
 function getStartWeight(exerciseId) {
   var custom = getStore('startWeights', {});
   if (custom[exerciseId] !== undefined) return custom[exerciseId];
   var ex = getExercise(exerciseId);
   var raw = (ex && ex.defaultWeight) ? ex.defaultWeight : 0;
-  if (isDumbbell(exerciseId) && raw > 0) {
-    var avail = getAvailableWeights(exerciseId);
-    var closest = avail[0] || raw;
-    for (var i = 0; i < avail.length; i++) {
-      if (Math.abs(avail[i] - raw) < Math.abs(closest - raw)) closest = avail[i];
-    }
-    return closest;
-  }
-  var step = getWeightStep(exerciseId);
-  if (step > 0 && raw > 0) {
-    raw = Math.round(raw / step) * step;
-    raw = parseFloat(raw.toFixed(2));
+  if (raw > 0) {
+    return snapToAvailable(exerciseId, raw);
   }
   return raw;
 }
@@ -709,12 +726,13 @@ function getProgressionSuggestion(exerciseId) {
 
   if (consecutiveMaxSessions >= 2) {
     // Hit max reps for 2+ sessions → increase weight, drop to min reps
+    var nextWeight = getNextWeightUp(exerciseId, lastWeight);
     return {
       ready: true,
       current: lastWeight,
-      suggested: lastWeight + increment,
+      suggested: nextWeight,
       targetReps: minReps,
-      message: '\uD83D\uDCAA Verhoog naar ' + (lastWeight + increment) + ' ' + unit + ' \u00b7 ' + numSets + '\u00d7' + minReps
+      message: '\uD83D\uDCAA Verhoog naar ' + nextWeight + ' ' + unit + ' \u00b7 ' + numSets + '\u00d7' + minReps
     };
   } else if (allSetsAtMax) {
     // Hit max reps once → do it again to confirm
