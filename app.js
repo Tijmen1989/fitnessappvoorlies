@@ -21,8 +21,12 @@ function setStore(key, val) {
         if (sessions.length > 100) {
           localStorage.setItem('lt_sessions', JSON.stringify(sessions.slice(-100)));
           localStorage.setItem('lt_' + key, JSON.stringify(val));
+        } else {
+          showStorageWarning();
         }
-      } catch(e2) { /* kan niet opslaan */ }
+      } catch(e2) {
+        showStorageWarning();
+      }
     }
   }
   // Cloud sync: stuur belangrijke data automatisch naar Firebase
@@ -32,6 +36,18 @@ function setStore(key, val) {
       saveToCloud('lt_' + key, val);
     }
   }
+}
+
+var _storageWarningShown = false;
+function showStorageWarning() {
+  if (_storageWarningShown) return;
+  _storageWarningShown = true;
+  var banner = document.createElement('div');
+  banner.id = 'storageBanner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#e74c3c;color:white;padding:12px 16px;font-size:13px;text-align:center;cursor:pointer';
+  banner.innerHTML = '\u26A0\uFE0F Opslag bijna vol! Sommige data wordt mogelijk niet opgeslagen. Exporteer je data via Profiel.';
+  banner.onclick = function() { banner.remove(); _storageWarningShown = false; };
+  document.body.appendChild(banner);
 }
 
 // ================================================================
@@ -664,6 +680,8 @@ function getProgressionSuggestion(exerciseId) {
   var maxReps = repRange.max;
   var numSets = 3;
 
+  var isBodyweight = exerciseDef.isBodyweight || exerciseDef.isPlank;
+
   // Get last session data with full sets info
   var sessions = getStore('sessions', []);
   var lastSession = null;
@@ -671,10 +689,16 @@ function getProgressionSuggestion(exerciseId) {
     var s = sessions[i];
     if (s.exercises) {
       var ex = s.exercises.find(function(e) { return e.id === exerciseId; });
-      if (ex && ex.weight > 0) { lastSession = ex; break; }
+      if (ex && !ex.skipped && (isBodyweight || ex.weight > 0)) { lastSession = ex; break; }
     }
   }
   if (!lastSession) {
+    if (isBodyweight) {
+      return {
+        ready: false, current: 0, suggested: 0, targetReps: minReps,
+        message: '\uD83C\uDD95 Start met ' + numSets + '\u00d7' + minReps + (exerciseDef.isPlank ? ' sec' : ' reps')
+      };
+    }
     var sw = getStartWeight(exerciseId);
     if (sw > 0) {
       return {
@@ -686,6 +710,21 @@ function getProgressionSuggestion(exerciseId) {
       };
     }
     return null;
+  }
+
+  // Bodyweight progression: only reps matter
+  if (isBodyweight) {
+    var bwReps = lastSession.reps || minReps;
+    var bwUnit = exerciseDef.isPlank ? 'sec' : 'reps';
+    if (bwReps >= maxReps) {
+      return { ready: true, current: 0, suggested: 0, targetReps: maxReps,
+        message: '\uD83D\uDCAA ' + numSets + '\u00d7' + maxReps + ' ' + bwUnit + ' gehaald! Probeer langzamer of met pauzes.'
+      };
+    }
+    var bwNext = Math.min(bwReps + 2, maxReps);
+    return { ready: false, current: 0, suggested: 0, targetReps: bwNext,
+      message: 'Probeer ' + numSets + '\u00d7' + bwNext + ' ' + bwUnit + ' (was ' + bwReps + ')'
+    };
   }
 
   var lastWeight = lastSession.weight;
@@ -2478,7 +2517,7 @@ function renderSorenessCheck(trainingKey) {
         if (postponed && postponed.trainingKey === trainingKey && postponed.fromDate === todayKey) {
           html += '<div style="margin-top:8px;font-size:12px;color:var(--text-light)">Training is verschoven naar morgen.</div>';
         } else {
-          html += '<div style="margin-top:10px"><button onclick="postponeTraining(\'' + trainingKey + '\')" style="padding:8px 16px;border-radius:8px;border:1px solid ' + advice.color + ';background:white;color:' + advice.color + ';cursor:pointer;font-size:13px;font-weight:600">Verschuif naar morgen</button></div>';
+          html += '<div style="margin-top:10px"><button onclick="postponeTraining(\'' + trainingKey + '\')" style="padding:8px 16px;border-radius:8px;border:1px solid ' + advice.color + ';background:var(--card);color:' + advice.color + ';cursor:pointer;font-size:13px;font-weight:600">Verschuif naar morgen</button></div>';
         }
       }
       html += '</div></div>';
@@ -3391,12 +3430,16 @@ function renderHistory() {
       if (history.length < 1) return;
       var latest = history[history.length - 1];
       var first = history[0];
-      var diff = latest.weight - first.weight;
+      var isBw = latest.isBodyweight;
+      var val = isBw ? latest.reps : latest.weight;
+      var firstVal = isBw ? first.reps : first.weight;
+      var unit = isBw ? 'reps' : getWeightUnit(exId);
+      var diff = val - firstVal;
       var diffStr = diff > 0 ? '+' + diff : (diff < 0 ? '' + diff : '\u00B10');
       var diffColor = diff > 0 ? 'var(--success)' : (diff < 0 ? 'var(--danger)' : 'var(--text-light)');
       html += '<tr style="border-bottom:1px solid var(--border)">';
       html += '<td style="padding:6px 16px 6px 16px;font-weight:500">' + ex.name + '</td>';
-      html += '<td style="padding:6px 4px;font-weight:700;text-align:right;white-space:nowrap">' + latest.weight + ' ' + getWeightUnit(exId) + '</td>';
+      html += '<td style="padding:6px 4px;font-weight:700;text-align:right;white-space:nowrap">' + val + ' ' + unit + '</td>';
       html += '<td style="padding:6px 16px 6px 8px;font-weight:600;color:' + diffColor + ';font-size:11px;white-space:nowrap">(' + diffStr + ')</td>';
       html += '</tr>';
     });
@@ -4151,12 +4194,13 @@ function createProgressCharts(sessions, measurements, weightGoal) {
       var color = colors[ci % colors.length];
 
       // Map data to allDates positions (sparse)
+      var isBw = hist[0] && hist[0].isBodyweight;
       var dateMap = {};
-      hist.forEach(function(h) { dateMap[h.date] = h.weight; });
+      hist.forEach(function(h) { dateMap[h.date] = isBw ? h.reps : h.weight; });
       var mappedData = allDates.map(function(d) { return dateMap[d] !== undefined ? dateMap[d] : null; });
 
       datasets.push({
-        label: ex.name,
+        label: ex.name + (isBw ? ' (reps)' : ''),
         data: mappedData,
         borderColor: color,
         backgroundColor: color + '20',
@@ -4852,9 +4896,13 @@ function buildExerciseHistory(sessions) {
   sessions.forEach(function(s) {
     if (!s.exercises) return;
     s.exercises.forEach(function(ex) {
-      if (ex.weight <= 0) return;
+      if (ex.skipped) return;
+      var exDef = getExercise(ex.id);
+      var isBodyweight = exDef && (exDef.isBodyweight || exDef.isPlank);
+      if (!isBodyweight && ex.weight <= 0) return;
+      if (isBodyweight && (!ex.reps || ex.reps <= 0)) return;
       if (!history[ex.id]) history[ex.id] = [];
-      history[ex.id].push({ date: s.date, weight: ex.weight, reps: ex.reps || 0 });
+      history[ex.id].push({ date: s.date, weight: ex.weight || 0, reps: ex.reps || 0, isBodyweight: !!isBodyweight });
     });
   });
   return history;

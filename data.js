@@ -151,7 +151,7 @@ const EXERCISE_DB = {
     rest: 60,
     tip: 'Houd de dumbbell tegen je borst, ga diep door je knie\u00ebn.',
     videoUrl: 'videos/goblet-squat.mp4',
-    youtubeId: '',
+    youtubeId: 'MeIiIdhvXT4',
     instruction: {
       goal: 'Benen, billen en core trainen met \u00e9\u00e9n oefening.',
       steps: [
@@ -175,7 +175,7 @@ const EXERCISE_DB = {
     tip: 'Knijp je billen samen bovenaan, houd 1\u20132 sec vast.',
     isBodyweight: true,
     videoUrl: 'videos/glute-bridge.mp4',
-    youtubeId: '',
+    youtubeId: 'Xp33YgPZgns',
     instruction: {
       goal: 'Bilspieren en achterkant bovenbenen (hamstrings) versterken.',
       steps: [
