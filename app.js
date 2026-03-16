@@ -1580,7 +1580,16 @@ function goStepBack() {
 }
 
 function skipExercise() {
-  // Skip hele oefening (alle resterende sets)
+  // Skip hele oefening — log als overgeslagen
+  var ex = getCurrentExercise();
+  if (ex) {
+    for (var sk = 1; sk <= totalSets; sk++) {
+      var skipKey = ex.id + '_s' + sk;
+      if (!sessionExerciseLog[skipKey] || !sessionExerciseLog[skipKey].done) {
+        sessionExerciseLog[skipKey] = { id: ex.id, weight: 0, reps: 0, done: false, skipped: true };
+      }
+    }
+  }
   tmState = 'idle';
   currentExerciseIndex++;
   currentSet = 1;
@@ -1625,13 +1634,17 @@ function renderCompletionInTrainingMode() {
   var maxWeight = 0;
   var maxWeightExId = '';
   var completedSets = 0;
+  var skippedIds = {};
   Object.keys(sessionExerciseLog).forEach(function(key) {
     var entry = sessionExerciseLog[key];
     if (entry.done) {
       completedSets++;
       if (entry.weight > maxWeight) { maxWeight = entry.weight; maxWeightExId = entry.id; }
+    } else if (entry.skipped) {
+      skippedIds[entry.id] = true;
     }
   });
+  var skippedCount = Object.keys(skippedIds).length;
   var maxWeightUnit = maxWeightExId ? getWeightUnit(maxWeightExId) : 'kg';
   var activeIds = currentExerciseIds.length > 0 ? currentExerciseIds : currentTraining.exerciseIds;
   exerciseCount = activeIds.length;
@@ -1642,7 +1655,7 @@ function renderCompletionInTrainingMode() {
   html += '<p style="color:var(--text-light);margin-bottom:20px">Lekker bezig, Lisanne!</p>';
   html += '<div class="completion-stats">';
   html += '<div class="completion-stat"><span class="completion-stat-label">Training</span><span class="completion-stat-value">' + currentTraining.name + '</span></div>';
-  html += '<div class="completion-stat"><span class="completion-stat-label">Oefeningen</span><span class="completion-stat-value">' + exerciseCount + '</span></div>';
+  html += '<div class="completion-stat"><span class="completion-stat-label">Oefeningen</span><span class="completion-stat-value">' + (exerciseCount - skippedCount) + '/' + exerciseCount + (skippedCount > 0 ? ' <span style="font-size:12px;color:var(--text-light)">(' + skippedCount + ' overgeslagen)</span>' : '') + '</span></div>';
   html += '<div class="completion-stat"><span class="completion-stat-label">Sets voltooid</span><span class="completion-stat-value">' + completedSets + '</span></div>';
   if (maxWeight > 0) {
     html += '<div class="completion-stat"><span class="completion-stat-label">Zwaarste gewicht</span><span class="completion-stat-value">' + maxWeight + ' ' + maxWeightUnit + '</span></div>';
@@ -1782,8 +1795,13 @@ function saveFinalSession() {
   });
 
   var exerciseMap = {};
+  var skippedExercises = {};
   Object.keys(sessionExerciseLog).forEach(function(key) {
     var val = sessionExerciseLog[key];
+    if (val.skipped && !val.done) {
+      skippedExercises[val.id] = true;
+      return;
+    }
     if (!val.done) return;
     var baseId = val.id;
     if (!exerciseMap[baseId]) exerciseMap[baseId] = { id: baseId, sets: [] };
@@ -1801,6 +1819,11 @@ function saveFinalSession() {
       reps: reps.length > 0 ? Math.max.apply(null, reps) : 0,
       sets: ex.sets
     });
+  });
+  Object.keys(skippedExercises).forEach(function(id) {
+    if (!exerciseMap[id]) {
+      exerciseLog.push({ id: id, weight: 0, reps: 0, sets: [], skipped: true });
+    }
   });
 
   var sessionData = {
