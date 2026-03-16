@@ -2502,7 +2502,7 @@ function renderSorenessCheck(trainingKey) {
   var isRestDay = !trainingKey;
   if (isRestDay) {
     var dsl = daysSinceLastTraining();
-    if (dsl > 2 || dsl >= 999) return '';
+    if (dsl > 4 || dsl >= 999) return '';
   }
 
   var todayKey = getTodayKey();
