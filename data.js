@@ -188,6 +188,52 @@ const EXERCISE_DB = {
       mistake: 'Te ver doorduwen met je onderrug (holle rug). Je lichaam moet een rechte lijn vormen van schouders tot knie\u00ebn.'
     }
   },
+  'dead-bug': {
+    id: 'dead-bug',
+    name: 'Dead bug',
+    apparaat: 'Op de grond',
+    reps: '8 per kant',
+    defaultReps: 8,
+    rest: 45,
+    isBodyweight: true,
+    tip: 'Rechts + links = 1 herhaling. Onderrug blijft op de grond!',
+    videoUrl: 'videos/dead-bug.mp4',
+    youtubeId: 'x-BStnplCYg',
+    instruction: {
+      goal: 'Diepe core-stabiliteit. Topexercise voor rug-stabiliteit.',
+      steps: [
+        'Ga op je rug liggen, armen recht omhoog, knieën op 90 graden.',
+        'Strek tegelijkertijd je rechterarm achter je hoofd en je linkerbeen naar voren.',
+        'Kom terug en wissel: linkerarm + rechterbeen. Rechts + links = 1 herhaling.',
+        'Houd je onderrug plat op de grond — dat is het belangrijkste.'
+      ],
+      focus: 'Je onderrug mag NIET van de grond komen. Als dat wel gebeurt, maak de beweging kleiner.',
+      mistake: 'Onderrug laten opkomen van de grond. Maak de beweging kleiner totdat je het gecontroleerd kunt.'
+    }
+  },
+  'bird-dog': {
+    id: 'bird-dog',
+    name: 'Bird-dog',
+    apparaat: 'Op de grond',
+    reps: '8 per kant',
+    defaultReps: 8,
+    rest: 45,
+    isBodyweight: true,
+    tip: 'Rechts + links = 1 herhaling. Rug stil houden!',
+    videoUrl: 'videos/bird-dog.mp4',
+    youtubeId: 'vtwhC3tfVow',
+    instruction: {
+      goal: 'Rug-stabiliteit. De oefening die je rug het meest helpt.',
+      steps: [
+        'Ga op handen en knieën zitten.',
+        'Strek tegelijkertijd je rechterarm naar voren en je linkerbeen naar achteren.',
+        'Houd 2–3 seconden stil, rug blijft recht.',
+        'Kom terug en wissel: linkerarm + rechterbeen. Rechts + links = 1 herhaling.'
+      ],
+      focus: 'Je rug en heupen blijven stil — niet meedraaien of kantelen. Span je buik licht aan.',
+      mistake: 'Je heup laten zakken naar de kant van het opgetilde been. Houd je heupen evenwijdig aan de grond.'
+    }
+  },
   'plank': {
     id: 'plank',
     name: 'Plank',
@@ -219,15 +265,15 @@ var PHASE_CONFIG = {
     name: 'Fase 1 \u2014 Basis',
     description: 'Leer de basisoefeningen goed uitvoeren',
     unlockRequirement: null,
-    krachtBoven: ['chest-press', 'shoulder-press', 'dumbbell-row', 'plank'],
-    krachtOnder: ['leg-curl', 'leg-ext', 'goblet-squat', 'glute-bridge', 'plank']
+    krachtBoven: ['chest-press', 'shoulder-press', 'dumbbell-row', 'plank', 'dead-bug'],
+    krachtOnder: ['leg-curl', 'leg-ext', 'goblet-squat', 'glute-bridge', 'plank', 'bird-dog']
   },
   2: {
     name: 'Fase 2 \u2014 Uitbreiding',
     description: 'Meer oefeningen en hogere intensiteit',
     unlockRequirement: { sessions: 12, weeks: 4 },
-    krachtBoven: ['chest-press', 'incline-press', 'shoulder-press', 'dumbbell-row', 'plank'],
-    krachtOnder: ['leg-curl', 'leg-ext', 'goblet-squat', 'glute-bridge', 'plank']
+    krachtBoven: ['chest-press', 'incline-press', 'shoulder-press', 'dumbbell-row', 'plank', 'dead-bug'],
+    krachtOnder: ['leg-curl', 'leg-ext', 'goblet-squat', 'glute-bridge', 'plank', 'bird-dog']
   }
 };
 
@@ -235,22 +281,22 @@ const TRAINING_DATA = {
   krachtBoven: {
     id: 'kracht-boven',
     name: 'Kracht: bovenlichaam',
-    description: 'Focus op borst, schouders en rug. Core stabiliteit met plank.',
+    description: 'Focus op borst, schouders en rug. Core stabiliteit met plank en dead bug.',
     type: 'kracht',
     warmup: { apparaat: 'Crosstrainer', duur: '5\u20138 min', detail: 'Laag tempo, lichte weerstand' },
     cooldown: '5 min rustig wandelen, daarna deze stretches:',
     cooldownStretches: ['chest-doorway', 'rug-stretch'],
-    exerciseIds: ['chest-press', 'incline-press', 'shoulder-press', 'dumbbell-row', 'plank']
+    exerciseIds: ['chest-press', 'incline-press', 'shoulder-press', 'dumbbell-row', 'plank', 'dead-bug']
   },
   krachtOnder: {
     id: 'kracht-onder',
     name: 'Kracht: onderlichaam',
-    description: 'Focus op benen en billen. Core stabiliteit met plank.',
+    description: 'Focus op benen en billen. Core stabiliteit met plank en bird-dog.',
     type: 'kracht',
     warmup: { apparaat: 'Loopband', duur: '5\u20138 min', detail: '5.0\u20135.5 km/u, incline 0\u20131% \u2014 rustig wandelen' },
     cooldown: '5 min rustig wandelen, daarna deze stretches:',
     cooldownStretches: ['hamstrings', 'quads', 'calves', 'glutes'],
-    exerciseIds: ['leg-curl', 'leg-ext', 'goblet-squat', 'glute-bridge', 'plank']
+    exerciseIds: ['leg-curl', 'leg-ext', 'goblet-squat', 'glute-bridge', 'plank', 'bird-dog']
   },
   cardioVariatie: {
     id: 'cardio-variatie',
