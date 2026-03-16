@@ -668,6 +668,8 @@ video.exercise-video {
   display: none;
   align-items: flex-end;
   justify-content: center;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 .modal-overlay.show { display: flex; }
 .modal-sheet {
