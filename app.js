@@ -401,7 +401,7 @@ function isDumbbell(exerciseId) {
   return ex && ex.apparaat && ex.apparaat.indexOf('Dumbbell') >= 0;
 }
 
-var DEFAULT_DUMBBELL_WEIGHTS = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 18, 20, 22.5, 25, 27.5, 30];
+var DEFAULT_DUMBBELL_WEIGHTS = [1, 2, 3, 4, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30];
 
 function getAvailableWeights(exerciseId) {
   var custom = getStore('availableWeights', {});
@@ -1217,18 +1217,23 @@ function renderTrainingStep() {
     html += '<input type="hidden" id="tmReps" value="' + defaultReps + '">';
     html += '</div>';
   } else {
-    // Plank with countdown timer
-    var plankSec = 30; // default
-    var plankMatch = ex.reps.match(/(\d+)/);
-    if (plankMatch) plankSec = parseInt(plankMatch[plankMatch.length - 1]); // use upper bound
+    // Plank with countdown timer — use progression to determine target seconds
+    var plankRepRange = parseRepRange(ex.reps);
+    var plankTarget = plankRepRange.min; // start at lower bound (e.g. 20)
+    if (progression && progression.targetReps) {
+      plankTarget = progression.targetReps;
+    } else if (prevWeight > 0) {
+      plankTarget = Math.min(prevWeight + 2, plankRepRange.max);
+    }
+    plankTarget = Math.max(plankRepRange.min, Math.min(plankTarget, plankRepRange.max));
 
     if (tmState === 'plank-timer') {
       html += '<div class="tm-timer plank-active" id="tmTimerDisplay">' + formatTimer(tmTimerSeconds) + '</div>';
       html += '<div style="font-size:14px;color:var(--text-light);margin-bottom:16px">Hou vol! Je kunt dit!</div>';
       html += '<button class="tm-btn tm-btn-success" onclick="clearInterval(tmTimerInterval);tmState=\'idle\';completeSet()">Plank klaar! \u2714</button>';
     } else {
-      html += '<div style="margin-bottom:16px;font-size:16px;color:var(--text-light)">Houd ' + ex.reps + ' vol!</div>';
-      html += '<button class="tm-btn tm-btn-accent" onclick="startPlankTimer(' + plankSec + ')">Start plank timer (' + plankSec + ' sec)</button>';
+      html += '<div style="margin-bottom:16px;font-size:16px;color:var(--text-light)">Doel: ' + plankTarget + ' seconden</div>';
+      html += '<button class="tm-btn tm-btn-accent" onclick="startPlankTimer(' + plankTarget + ')">Start plank timer (' + plankTarget + ' sec)</button>';
     }
   }
 
