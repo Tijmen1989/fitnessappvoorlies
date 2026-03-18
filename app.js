@@ -2806,12 +2806,30 @@ function renderKrachtOverview(container, training, trainingKey, todayKey, motivH
   html += '<div style="font-size:13px;color:var(--text-light)">3 sets per oefening \u00b7 \u00b145 min</div>';
   html += '</div></div>';
 
+  // Start button — prominent, direct zichtbaar
+  var todaySessions = getStore('sessions', []).filter(function(s) { return s.date === todayKey && s.trainingKey === trainingKey; });
+  if (todaySessions.length > 0) {
+    var ts = todaySessions[todaySessions.length - 1];
+    var exCount = ts.exercises ? ts.exercises.length : 0;
+    html += '<div style="background:var(--success-bg);border:1px solid var(--success);border-radius:12px;padding:14px 16px;margin:4px 0 12px;text-align:center">';
+    html += '<div style="font-size:24px;margin-bottom:4px">\u2705</div>';
+    html += '<div style="font-size:16px;font-weight:700;color:var(--success-text)">Training afgerond!</div>';
+    html += '<div style="font-size:13px;color:var(--text-light);margin-top:4px">' + exCount + ' oefeningen voltooid</div>';
+    html += '</div>';
+    html += '<button class="start-training-btn" onclick="startTrainingMode(\'' + trainingKey + '\')" style="opacity:0.6;font-size:14px;margin:0 0 12px">Opnieuw starten</button>';
+  } else {
+    html += '<button class="start-training-btn" onclick="startTrainingMode(\'' + trainingKey + '\')" style="margin:4px 0 12px">Training starten \u25B6</button>';
+  }
+
   // Warmup
   html += '<div class="phase-block"><div class="phase-icon">\uD83D\uDD25</div>';
   html += '<div class="phase-text"><strong>Warming-up:</strong> ' + training.warmup.apparaat + ' ' + training.warmup.duur + ' \u2014 ' + training.warmup.detail + '</div></div>';
 
-  // Exercise preview list (phase-aware)
+  // Exercise preview list (collapsible)
   var phaseExercises = getTrainingExercises(trainingKey);
+  html += '<div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';this.querySelector(\'span:last-child\').textContent=this.nextElementSibling.style.display===\'none\'?\'\u25B6\':\'\u25BC\'" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;cursor:pointer;color:var(--text-light);font-size:13px;font-weight:600;border-top:1px solid var(--border)">';
+  html += '<span>' + phaseExercises.length + ' oefeningen bekijken</span><span>\u25B6</span></div>';
+  html += '<div style="display:none">';
   phaseExercises.forEach(function(exId) {
     var ex = getExercise(exId);
     if (!ex) return;
@@ -2849,58 +2867,24 @@ function renderKrachtOverview(container, training, trainingKey, todayKey, motivH
 
     html += '</div>';
   });
+  html += '</div>'; // close collapsible exercise list
 
-  // Cooldown
+  // Cooldown (compact summary)
   html += '<div class="phase-block"><div class="phase-icon">\u2744\uFE0F</div>';
-  html += '<div class="phase-text"><strong>Cooldown:</strong> ' + training.cooldown;
-  if (training.cooldownStretches && training.cooldownStretches.length > 0) {
-    html += '<div style="margin-top:8px">';
-    training.cooldownStretches.forEach(function(sid, idx) {
-      var s = getStretchById(sid);
-      if (!s) return;
-      html += '<div style="font-size:13px;color:var(--text);padding:6px 0;border-top:' + (idx === 0 ? 'none' : '1px solid var(--border)') + '">';
-      html += '<div style="display:flex;align-items:center;gap:6px">';
-      html += '<span style="font-weight:700;color:var(--primary);min-width:18px">' + (idx + 1) + '.</span>';
-      html += '<span style="flex:1">' + s.name + ' <span style="color:var(--text-light)">(' + s.duur + 's' + (s.perKant ? '/kant' : '') + ')</span></span>';
-      html += '<span style="cursor:pointer;font-size:16px" onclick="toggleOverviewInstruction(\'stretch-' + sid + '\')">\u2139\uFE0F</span>';
-      html += '</div>';
-      html += '<div class="ex-extra" id="overview-instr-stretch-' + sid + '">';
-      html += '<div style="padding:8px 0 4px 24px">';
-      if (s.videoUrl) html += '<video src="' + s.videoUrl + '" autoplay loop muted playsinline style="width:100%;max-width:200px;border-radius:8px;margin-bottom:6px"></video>';
-      html += '<p style="font-size:12px;color:var(--text-light);line-height:1.5;margin:0">' + s.instruction + '</p>';
-      if (s.focus) html += '<p style="font-size:12px;color:var(--success);line-height:1.4;margin:4px 0 0">\u2714\uFE0F ' + s.focus + '</p>';
-      html += '</div></div>';
-      html += '</div>';
-    });
-    html += '</div>';
-  }
-  html += '</div></div>';
-  html += '</div>';
+  html += '<div class="phase-text"><strong>Cooldown:</strong> ' + training.cooldown + '</div></div>';
+
+  html += '</div>'; // close card
 
   // Ease-back hint
   if (daysSince >= 14 && daysSince < 999) {
     html += '<div class="ease-back-hint show">Het is even geleden \u2014 begin gerust iets lichter dan vorige keer.</div>';
   }
 
-  // Start button — check of training vandaag al is gedaan
-  var todaySessions = getStore('sessions', []).filter(function(s) { return s.date === todayKey && s.trainingKey === trainingKey; });
-  if (todaySessions.length > 0) {
-    var ts = todaySessions[todaySessions.length - 1];
-    var exCount = ts.exercises ? ts.exercises.length : 0;
-    html += '<div style="background:var(--success-bg);border:1px solid var(--success);border-radius:12px;padding:14px 16px;margin:12px 16px;text-align:center">';
-    html += '<div style="font-size:24px;margin-bottom:4px">\u2705</div>';
-    html += '<div style="font-size:16px;font-weight:700;color:var(--success-text)">Training afgerond!</div>';
-    html += '<div style="font-size:13px;color:var(--text-light);margin-top:4px">' + exCount + ' oefeningen voltooid</div>';
-    html += '</div>';
-    html += '<button class="start-training-btn" onclick="startTrainingMode(\'' + trainingKey + '\')" style="opacity:0.6;font-size:14px">Opnieuw starten</button>';
-  } else {
-    html += '<button class="start-training-btn" onclick="startTrainingMode(\'' + trainingKey + '\')">Training starten \u25B6</button>';
-  }
-
   // Vandaag anders? section
   html += renderVandaagAnders(trainingKey);
 
   container.innerHTML = html;
+  initVideoObserver();
 }
 
 function toggleOverviewInstruction(exId) {
