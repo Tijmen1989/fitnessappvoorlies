@@ -437,12 +437,12 @@ var STRETCH_ROUTINES = [
   },
   {
     id: 'hamstrings',
-    name: 'Hamstrings stretch',
+    name: 'Achterbeen stretch (staand)',
     duur: 30,
     perKant: true,
-    instruction: 'Ga op je rug liggen bij een muur. Strek je benen omhoog tegen de muur, billen zo dicht mogelijk bij de muur. Buig \u00e9\u00e9n been, houd het andere gestrekt. Duw je dij richting de muur tot je een rek voelt. Houd 30 seconden, wissel dan.',
+    instruction: 'Zet een voet een kleine stap naar voren, hiel op de grond, tenen omhoog. Buig licht door je achterste knie en leun met rechte rug voorover. Je voelt een rek achter in je bovenbeen. Houd 30 seconden, wissel dan.',
     videoUrl: 'videos/hamstrings.mp4',
-    focus: 'Billen dicht bij de muur, been gestrekt houden'
+    focus: 'Rug recht houden, niet afronden.'
   },
   {
     id: 'quads',
@@ -455,12 +455,12 @@ var STRETCH_ROUTINES = [
   },
   {
     id: 'calves',
-    name: 'Kuiten stretch',
+    name: 'Kuiten stretch (staand)',
     duur: 30,
     perKant: true,
-    instruction: 'Zet de bal van je voet tegen de muur, hiel blijft op de grond. Handen op schouderhoogte tegen de muur. Leun langzaam naar voren tot je een rek voelt in je kuit. Houd 30 seconden, wissel dan.',
+    instruction: 'Zet een voet een stap naar achteren. Houd je achterste been gestrekt en druk je hiel in de grond. Leun licht naar voren tot je een rek voelt in je kuit. Houd 30 seconden, wissel dan.',
     videoUrl: 'videos/calves.mp4',
-    focus: 'Knie gestrekt houden, langzaam en gecontroleerd'
+    focus: 'Achterste been gestrekt, hiel op de grond.'
   },
   {
     id: 'chest-doorway',
@@ -473,12 +473,12 @@ var STRETCH_ROUTINES = [
   },
   {
     id: 'rug-stretch',
-    name: 'Rug stretch (cobra)',
+    name: 'Rug stretch (staand)',
     duur: 30,
     perKant: false,
-    instruction: 'Ga op je buik liggen met je onderarmen plat op de grond. Duw je bovenlichaam omhoog door je ellebogen te strekken. Houd 30 seconden en kom langzaam terug.',
+    instruction: 'Sta rechtop. Leg je handen op je onderrug. Leun rustig naar achteren en duw je heupen licht naar voren. Je voelt een zachte rek in je onderrug. Houd 30 seconden.',
     videoUrl: 'videos/rug-stretch.mp4',
-    focus: 'Schouders laag, kijk recht vooruit, niet te ver doorduwen'
+    focus: 'Niet te ver, rustig ademen. Knieën licht gebogen houden.'
   },
   {
     id: 'glutes',

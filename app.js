@@ -974,6 +974,7 @@ function pauseTraining() {
     '<button onclick="exitPause()" style="background:transparent;color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.3);padding:10px 32px;border-radius:8px;font-size:14px;cursor:pointer">Training stoppen</button>';
   document.body.appendChild(overlay);
   document.body.style.overflow = 'hidden';
+  document.documentElement.style.overflow = 'hidden';
 }
 
 function resumeFromPause() {
@@ -1887,6 +1888,7 @@ function saveFeedbackAndStartWandelen() {
   // Close kracht completion and start loopband
   document.getElementById('trainingMode').classList.remove('active');
   document.body.style.overflow = '';
+  document.documentElement.style.overflow = '';
   startLoopbandWandelen();
 }
 
@@ -2202,6 +2204,7 @@ function stopCardioTimer() {
   document.getElementById('trainingMode').classList.remove('active');
   document.getElementById('bottomNav').style.display = 'flex';
   document.body.style.overflow = '';
+  document.documentElement.style.overflow = '';
   renderToday();
 }
 
@@ -3134,6 +3137,8 @@ function showStretchTimerOverlay() {
     '<div class="tm-body" id="stretchBody"></div>';
   document.body.appendChild(overlay);
   document.getElementById('bottomNav').style.display = 'none';
+  document.body.style.overflow = 'hidden';
+  document.documentElement.style.overflow = 'hidden';
 }
 
 function runStretchStep() {
@@ -3252,6 +3257,7 @@ function stopStretchTimer() {
   if (overlay) overlay.remove();
   document.getElementById('bottomNav').style.display = 'flex';
   document.body.style.overflow = '';
+  document.documentElement.style.overflow = '';
 }
 
 // ================================================================
@@ -3652,6 +3658,7 @@ function renderHistory() {
   }
 
   html += '<div class="checkin-form">';
+  html += '<div class="checkin-field"><label>Datum</label><input type="date" id="inputDate" value="' + getTodayKey() + '" max="' + getTodayKey() + '"></div>';
   html += '<div class="checkin-field"><label>Gewicht (kg)</label><input type="number" step="0.1" id="inputWeight" placeholder="bv. 74.5"></div>';
   if (showBodyFields) {
     html += '<div class="checkin-field"><label>Tailleomtrek (cm) <span style="font-weight:400;font-size:11px;color:var(--text-light)">\u2014 smalste punt, ter hoogte van navel</span></label><input type="number" step="0.5" id="inputWaist" placeholder="bv. 82"></div>';
@@ -4983,6 +4990,8 @@ function buildExerciseHistory(sessions) {
 }
 
 function saveMeasurement() {
+  var dateEl = document.getElementById('inputDate');
+  var measureDate = (dateEl && dateEl.value) ? dateEl.value : getTodayKey();
   var weight = parseFloat(document.getElementById('inputWeight').value);
   var waist = parseFloat(document.getElementById('inputWaist').value) || null;
   var hip = parseFloat(document.getElementById('inputHip').value) || null;
@@ -4992,7 +5001,13 @@ function saveMeasurement() {
   if (goal && goal > 0) setStore('weightGoal', goal);
 
   var measurements = getStore('measurements', []);
-  measurements.push({ date: getTodayKey(), weight: weight, waist: waist, hip: hip });
+  var existing = measurements.findIndex(function(m) { return m.date === measureDate; });
+  if (existing >= 0) {
+    measurements[existing] = { date: measureDate, weight: weight, waist: waist, hip: hip };
+  } else {
+    measurements.push({ date: measureDate, weight: weight, waist: waist, hip: hip });
+    measurements.sort(function(a, b) { return a.date.localeCompare(b.date); });
+  }
   setStore('measurements', measurements);
 
   document.getElementById('inputWeight').value = '';
