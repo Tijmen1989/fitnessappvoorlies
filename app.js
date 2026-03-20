@@ -398,7 +398,7 @@ function getLastWeight(exerciseId) {
 
 function isDumbbell(exerciseId) {
   var ex = getExercise(exerciseId);
-  return ex && ex.apparaat && ex.apparaat.indexOf('Dumbbell') >= 0;
+  return ex && ex.apparaat && ex.apparaat.toLowerCase().indexOf('dumbbell') >= 0;
 }
 
 var DEFAULT_DUMBBELL_WEIGHTS = [1, 2, 3, 4, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30];
