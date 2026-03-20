@@ -927,6 +927,7 @@ function startTrainingMode(trainingKey) {
   document.getElementById('trainingMode').classList.add('active');
   document.getElementById('bottomNav').style.display = 'none';
   document.body.style.overflow = 'hidden';
+  document.documentElement.style.overflow = 'hidden';
   startIdleCheck();
   renderTrainingStep();
 }
@@ -1086,6 +1087,7 @@ function exitTrainingMode(save) {
   document.getElementById('trainingMode').classList.remove('active');
   document.getElementById('bottomNav').style.display = 'flex';
   document.body.style.overflow = '';
+  document.documentElement.style.overflow = '';
 
   if (save) {
     saveFinalSession();
@@ -2514,12 +2516,37 @@ function renderSorenessCheck(trainingKey) {
   var sorenessLog = getStore('sorenessLog', {});
   var todayData = sorenessLog[todayKey] || {};
 
-  var allFilledNone = SORENESS_GROUPS.every(function(g) { return todayData[g.id] === 0; });
+  var filledCount = SORENESS_GROUPS.filter(function(g) { return todayData[g.id] !== undefined; }).length;
+  var allFilled = filledCount === SORENESS_GROUPS.length;
 
   var html = '<div class="card" style="margin:8px 16px;padding:0">';
+
+  // Als alles ingevuld is: toon alleen compact advies
+  if (allFilled) {
+    var advice = getSorenessAdvice(todayData, trainingKey);
+    if (advice) {
+      html += '<div style="padding:12px 16px">';
+      html += '<div style="font-size:13px;color:var(--text);line-height:1.5;background:' + advice.bg + ';border-radius:8px;padding:10px 12px;border:1px solid ' + advice.color + '">';
+      html += '<strong>' + advice.emoji + ' ' + advice.title + '</strong><br>' + advice.text;
+      if (advice.showPostpone) {
+        var postponed = getStore('postponedTraining', null);
+        if (postponed && postponed.trainingKey === trainingKey && postponed.fromDate === todayKey) {
+          html += '<div style="margin-top:8px;font-size:12px;color:var(--text-light)">Training is verschoven naar morgen.</div>';
+        } else {
+          html += '<div style="margin-top:10px"><button onclick="postponeTraining(\'' + trainingKey + '\')" style="padding:8px 16px;border-radius:8px;border:1px solid ' + advice.color + ';background:var(--card);color:' + advice.color + ';cursor:pointer;font-size:13px;font-weight:600">Verschuif naar morgen</button></div>';
+        }
+      }
+      html += '</div>';
+      html += '<button onclick="resetSoreness()" style="display:block;margin:8px auto 0;background:none;border:none;color:var(--text-light);font-size:11px;cursor:pointer">Wijzigen</button>';
+      html += '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
   html += '<div class="card-header"><span class="icon">\uD83E\uDDB5</span>Nog last van vorige training?</div>';
 
-  if (Object.keys(todayData).length === 0) {
+  if (filledCount === 0) {
     html += '<div style="padding:10px 16px;border-top:1px solid var(--border);text-align:center">';
     html += '<button onclick="clearAllSoreness()" style="padding:10px 20px;border-radius:10px;border:2px solid var(--success);background:var(--success-bg);color:var(--success-text);cursor:pointer;font-size:14px;font-weight:600;width:100%">';
     html += '\u2705 Geen klachten \u2014 lekker bezig!</button></div>';

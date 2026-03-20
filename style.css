@@ -368,10 +368,16 @@ video.exercise-video {
   z-index: 500;
   display: none;
   flex-direction: column;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
+  overscroll-behavior: contain;
 }
 .training-mode.active { display: flex; }
+.training-mode .tm-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
 
 .tm-header {
   background: var(--primary);

@@ -428,12 +428,12 @@ function getExercise(id) {
 var STRETCH_ROUTINES = [
   {
     id: 'hip-flexor',
-    name: 'Hip flexor stretch',
+    name: 'Heup stretch (staand)',
     duur: 30,
     perKant: true,
-    instruction: 'Ga in een uitvalspas staan (één voet ver naar voren, andere knie op de grond). Duw je heupen langzaam naar voren. Je voelt een rek aan de voorkant van je heup en bovenbeen aan de achterkant. Houd 30 seconden, wissel dan.',
+    instruction: 'Sta rechtop, houd je ergens aan vast. Zet een voet een stap naar achteren. Buig je voorste knie licht en duw je heup van het achterste been naar voren. Je voelt een rek aan de voorkant van je heup. Houd 30 seconden per kant.',
     videoUrl: 'videos/hip-flexor.mp4',
-    focus: 'Bovenlichaam rechtop houden, niet voorover leunen'
+    focus: 'Rug recht houden, niet voorover leunen.'
   },
   {
     id: 'hamstrings',
@@ -482,12 +482,12 @@ var STRETCH_ROUTINES = [
   },
   {
     id: 'glutes',
-    name: 'Billen & heup stretch',
+    name: 'Billen stretch (zittend)',
     duur: 30,
     perKant: true,
-    instruction: 'Ga op de grond zitten. Breng \u00e9\u00e9n been gebogen voor je, het andere been strek je naar achteren. Strek je arm aan dezelfde kant als je voorste been uit over de grond. Leun voorover tot je een rek voelt in je bil. Houd 30 seconden, wissel dan.',
+    instruction: 'Ga op een stoel of bankje zitten. Leg je rechterenkel op je linkerknie (figuur-4 houding). Leun rustig voorover tot je een rek voelt in je rechterbil. Houd 30 seconden, wissel dan.',
     videoUrl: 'videos/glutes.mp4',
-    focus: 'Houd je heupen zo recht mogelijk, leun rustig voorover'
+    focus: 'Rug recht houden, rustig ademen.'
   }
 ];
 
