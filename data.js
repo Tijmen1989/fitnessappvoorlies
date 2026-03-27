@@ -423,6 +423,19 @@ function getExercise(id) {
 }
 
 // ================================================================
+// DAILY ROUTINE (mobiliteit & core — elke dag)
+// ================================================================
+var DAILY_ROUTINE = [
+  { id: 'cat-cow', name: 'Cat-cow', target: '10x', type: 'reps', totalTime: 30 },
+  { id: 'dead-bug', name: 'Dead bug', target: '10/kant', type: 'reps', totalTime: 40 },
+  { id: 'bird-dog', name: 'Bird-dog', target: '10/kant', type: 'reps', totalTime: 40 },
+  { id: 'plank', name: 'Plank', target: '30 sec', type: 'timed', totalTime: 45 },
+  { id: 'glute-bridge', name: 'Glute bridge', target: '15x', type: 'reps', totalTime: 30 },
+  { id: 'neck-mobility', name: 'Neck mobility', target: '5/richting', type: 'reps', totalTime: 20 },
+  { id: 'shoulder-mobility', name: 'Shoulder mobility', target: '10x', type: 'reps', totalTime: 20 }
+];
+
+// ================================================================
 // STRETCH ROUTINES (rustdagen)
 // ================================================================
 var STRETCH_ROUTINES = [

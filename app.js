@@ -914,6 +914,10 @@ var _timerStartTime = 0;
 var _timerTotalSeconds = 0;
 var _dailyTimerStartTime = 0;
 var _dailyTimerTotalSeconds = 0;
+var dailyRoutineActive = false;
+var dailyRoutineIndex = 0;
+var dailyRoutineTimerInterval = null;
+var dailyRoutineTimerSeconds = 0;
 var tmState = 'idle'; // idle, set, resting
 var sessionExerciseLog = {};
 var _lastActivityTime = Date.now();
@@ -3321,6 +3325,156 @@ function stopStretchTimer() {
   document.getElementById('bottomNav').style.display = 'flex';
   document.body.style.overflow = '';
   document.documentElement.style.overflow = '';
+}
+
+// ================================================================
+// DAILY ROUTINE (mobiliteit & core)
+// ================================================================
+function getLastPlankDuration(exerciseId) {
+  var sessions = getStore('sessions', []);
+  for (var i = sessions.length - 1; i >= 0; i--) {
+    var s = sessions[i];
+    if (s.exercises) {
+      var ex = s.exercises.find(function(e) { return e.id === exerciseId; });
+      if (ex && ex.plankSeconds) return ex.plankSeconds;
+    }
+  }
+  return 0;
+}
+
+function startDailyRoutine() {
+  dailyRoutineActive = true;
+  dailyRoutineIndex = 0;
+  dailyRoutineTimerSeconds = 0;
+
+  var overlay = document.createElement('div');
+  overlay.id = 'dailyRoutineOverlay';
+  overlay.className = 'training-mode active';
+  overlay.innerHTML = '<div class="tm-header"><h2>Dagelijkse routine</h2>' +
+    '<button class="tm-close" onclick="stopDailyRoutine()">Stoppen</button></div>' +
+    '<div class="tm-progress"><div class="tm-progress-bar" id="dailyRoutineProgressBar" style="width:0%"></div></div>' +
+    '<div class="tm-body" id="dailyRoutineBody"></div>';
+  document.body.appendChild(overlay);
+  document.getElementById('bottomNav').style.display = 'none';
+
+  renderDailyRoutineStep();
+}
+
+function renderDailyRoutineStep() {
+  if (dailyRoutineIndex >= DAILY_ROUTINE.length) {
+    finishDailyRoutine();
+    return;
+  }
+
+  var exercise = DAILY_ROUTINE[dailyRoutineIndex];
+  var body = document.getElementById('dailyRoutineBody');
+  if (!body) return;
+
+  var pctBar = Math.round(((dailyRoutineIndex + 1) / DAILY_ROUTINE.length) * 100);
+  var bar = document.getElementById('dailyRoutineProgressBar');
+  if (bar) bar.style.width = pctBar + '%';
+
+  var exDef = getExercise(exercise.id);
+
+  var html = '<div class="tm-warmup-cooldown">';
+  html += '<div style="font-size:14px;color:var(--primary-light);font-weight:600;margin-bottom:12px">Oefening ' + (dailyRoutineIndex + 1) + ' / ' + DAILY_ROUTINE.length + '</div>';
+  html += '<div class="tm-exercise-name" style="font-size:24px;margin-bottom:8px">' + exercise.name + '</div>';
+  html += '<div class="tm-exercise-detail">Doel: ' + exercise.target + '</div>';
+
+  if (exDef && exDef.instruction) {
+    html += '<button class="tm-instruction-toggle" onclick="var el=document.getElementById(\'dailyInstr\');el.style.display=el.style.display===\'none\'?\'block\':\'none\'">Hoe doe ik deze oefening?</button>';
+    html += '<div id="dailyInstr" style="display:none;text-align:left;background:var(--card);border-radius:10px;padding:12px;margin:8px 0;font-size:13px;line-height:1.5">';
+    html += '<div style="color:var(--primary);font-weight:600;margin-bottom:4px">' + exDef.instruction.goal + '</div>';
+    html += '<ol style="margin:4px 0;padding-left:20px">';
+    exDef.instruction.steps.forEach(function(s) { html += '<li style="margin-bottom:4px">' + s + '</li>'; });
+    html += '</ol>';
+    html += '<div style="color:var(--success);font-size:12px;margin-top:4px">' + exDef.instruction.focus + '</div>';
+    html += '</div>';
+  }
+
+  if (exercise.type === 'timed') {
+    html += '<div class="tm-timer" id="dailyRoutineTimer" style="font-size:48px;margin:24px 0">' + formatTimer(dailyRoutineTimerSeconds) + '</div>';
+    html += '<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:16px">';
+    if (dailyRoutineTimerSeconds === 0) {
+      var seconds = 30;
+      if (exercise.id === 'plank') {
+        var lastPlank = getLastPlankDuration('plank');
+        if (lastPlank > 0) seconds = Math.min(lastPlank + 5, 120);
+      }
+      html += '<button class="tm-btn tm-btn-accent" onclick="startDailyRoutineTimer(' + seconds + ')">Start timer (' + seconds + 's)</button>';
+    } else {
+      html += '<button class="tm-btn tm-btn-success" onclick="nextDailyRoutineExercise()">Voltooid</button>';
+      html += '<button class="tm-btn tm-btn-outline" style="max-width:150px" onclick="addDailyRoutineTime(5)">+5s</button>';
+    }
+    html += '</div>';
+  } else {
+    html += '<div style="text-align:center;padding:12px 0">';
+    html += '<div style="font-size:14px;color:var(--text-light);margin-bottom:8px">Voer ' + exercise.target + ' uit</div>';
+    html += '</div>';
+    html += '<button class="tm-btn tm-btn-success" onclick="nextDailyRoutineExercise()" style="width:100%;margin-top:16px;padding:12px">Voltooid</button>';
+  }
+
+  html += '</div>';
+  body.innerHTML = html;
+}
+
+function startDailyRoutineTimer(seconds) {
+  dailyRoutineTimerSeconds = seconds;
+  _dailyTimerTotalSeconds = seconds;
+  renderDailyRoutineStep();
+  clearInterval(dailyRoutineTimerInterval);
+  _dailyTimerStartTime = Date.now();
+  dailyRoutineTimerInterval = setInterval(function() {
+    var elapsed = Math.floor((Date.now() - _dailyTimerStartTime) / 1000);
+    dailyRoutineTimerSeconds = Math.max(0, _dailyTimerTotalSeconds - elapsed);
+    var display = document.getElementById('dailyRoutineTimer');
+    if (display) display.textContent = formatTimer(dailyRoutineTimerSeconds);
+    if (dailyRoutineTimerSeconds <= 0) {
+      clearInterval(dailyRoutineTimerInterval);
+      hapticFeedback('heavy');
+      nextDailyRoutineExercise();
+    }
+  }, 500);
+}
+
+function addDailyRoutineTime(seconds) {
+  _dailyTimerTotalSeconds += seconds;
+  var elapsed = Math.floor((Date.now() - _dailyTimerStartTime) / 1000);
+  dailyRoutineTimerSeconds = Math.max(0, _dailyTimerTotalSeconds - elapsed);
+  var display = document.getElementById('dailyRoutineTimer');
+  if (display) display.textContent = formatTimer(dailyRoutineTimerSeconds);
+}
+
+function nextDailyRoutineExercise() {
+  clearInterval(dailyRoutineTimerInterval);
+  dailyRoutineTimerSeconds = 0;
+  dailyRoutineIndex++;
+  renderDailyRoutineStep();
+}
+
+function finishDailyRoutine() {
+  var body = document.getElementById('dailyRoutineBody');
+  if (!body) return;
+  var bar = document.getElementById('dailyRoutineProgressBar');
+  if (bar) bar.style.width = '100%';
+  setStore('dailyRoutineCompleted_' + getTodayKey(), true);
+
+  var html = '<div class="completion-screen">';
+  html += '<div class="emoji">\uD83C\uDF1F</div>';
+  html += '<h2>Goed gedaan!</h2>';
+  html += '<p style="color:var(--text-light);margin-bottom:24px">Je dagelijkse routine is voltooid!</p>';
+  html += '<button class="tm-btn tm-btn-success" onclick="stopDailyRoutine()">Klaar</button>';
+  html += '</div>';
+  body.innerHTML = html;
+}
+
+function stopDailyRoutine() {
+  clearInterval(dailyRoutineTimerInterval);
+  dailyRoutineActive = false;
+  var overlay = document.getElementById('dailyRoutineOverlay');
+  if (overlay) overlay.remove();
+  document.getElementById('bottomNav').style.display = 'flex';
+  showPage('pageTrain', document.querySelectorAll('.nav-item')[0]);
 }
 
 // ================================================================
