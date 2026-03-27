@@ -1,17 +1,17 @@
 :root {
-  --primary: #1B4F72;
-  --primary-light: #2E75B6;
-  --primary-dark: #154360;
-  --accent: #F39C12;
-  --success: #27AE60;
-  --danger: #E74C3C;
+  --primary: #7B3FA0;
+  --primary-light: #9B6BBF;
+  --primary-dark: #5E2D7A;
+  --accent: #FCC200;
+  --success: #8DC63F;
+  --danger: #F74B7A;
   --bg: #F5F7FA;
   --card: #FFFFFF;
   --text: #333333;
   --text-light: #888888;
   --border: #E8ECF0;
   --shadow: 0 2px 8px rgba(0,0,0,0.08);
-  --warning: #F39C12;
+  --warning: #FCC200;
   --success-bg: #F0FAF0;
   --success-text: #1E8449;
   --warning-bg: #FEF9E7;
@@ -21,38 +21,41 @@
   --subtle-bg: #F8FAFB;
   --danger-bg: #FDEDEC;
   --neutral-bg: #BDC3C7;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
 }
 
 /* Dark mode overrides */
 [data-theme="dark"] {
-  --primary: #2E75B6;
-  --primary-light: #4A9FE5;
-  --primary-dark: #1B4F72;
-  --accent: #F5B041;
+  --primary: #9B6BBF;
+  --primary-light: #B794D6;
+  --primary-dark: #7B3FA0;
+  --accent: #FCC200;
   --bg: #1A1A2E;
   --card: #222240;
   --text: #E8E8E8;
   --text-light: #999AAD;
   --border: #33334A;
   --shadow: 0 2px 8px rgba(0,0,0,0.3);
-  --warning: #F5B041;
-  --success-bg: rgba(39,174,96,0.08);
+  --warning: #FCC200;
+  --success-bg: rgba(141,198,63,0.1);
   --success-text: #5DDE8E;
   --warning-bg: #2A2A20;
   --warning-text: #E0C060;
-  --info-bg: rgba(46,117,182,0.12);
-  --hint-bg: rgba(39,174,96,0.08);
+  --info-bg: rgba(155,107,191,0.12);
+  --hint-bg: rgba(141,198,63,0.08);
   --subtle-bg: var(--card);
-  --danger-bg: rgba(231,76,60,0.1);
+  --danger-bg: rgba(247,75,122,0.1);
   --neutral-bg: #555568;
 }
-[data-theme="dark"] .topbar { background: #16213E; }
-[data-theme="dark"] .bottom-nav { background: #16213E; border-top-color: #33334A; }
+[data-theme="dark"] .topbar { background: var(--card); border-bottom-color: var(--border); }
+[data-theme="dark"] .bottom-nav { background: var(--card); border-top-color: var(--border); }
 [data-theme="dark"] .nav-item { color: #999AAD; }
 [data-theme="dark"] .nav-item.active { color: #F5B041; }
 [data-theme="dark"] .tm-header { background: #16213E; }
 [data-theme="dark"] .training-mode { background: var(--bg); }
-[data-theme="dark"] .motivation-strip { background: linear-gradient(135deg, #16213E, #0F3460); }
+[data-theme="dark"] .motivation-strip { background: #1A1A2E; }
 [data-theme="dark"] input, [data-theme="dark"] textarea { background: #2A2A45; color: #E8E8E8; border-color: #33334A; }
 [data-theme="dark"] .modal-sheet { background: var(--card); color: var(--text); }
 [data-theme="dark"] .modal-option { border-color: var(--border); }
@@ -67,7 +70,8 @@
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
@@ -79,24 +83,27 @@ body {
    TOP BAR
    ================================================================ */
 .topbar {
-  background: var(--primary);
-  color: white;
-  padding: 16px 20px;
-  padding-top: max(16px, env(safe-area-inset-top));
+  background: var(--card);
+  color: var(--text);
+  padding: 18px 20px 14px;
+  padding-top: max(18px, env(safe-area-inset-top));
   position: sticky;
   top: 0;
   z-index: 100;
+  border-bottom: 1px solid var(--border);
 }
-.topbar h1 { font-size: 18px; font-weight: 600; }
-.topbar .subtitle { font-size: 13px; opacity: 0.8; margin-top: 2px; }
+.topbar h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; color: var(--text); }
+.topbar .subtitle { font-size: 13px; color: var(--text-light); margin-top: 3px; font-weight: 500; }
 .topbar .week-badge {
   display: inline-block;
-  background: rgba(255,255,255,0.2);
+  background: var(--info-bg);
+  color: var(--primary);
   padding: 3px 10px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
+  border-radius: 50px;
+  font-size: 11px;
+  font-weight: 700;
   margin-left: 8px;
+  letter-spacing: 0.3px;
 }
 
 /* ================================================================
@@ -104,15 +111,18 @@ body {
    ================================================================ */
 .card {
   background: var(--card);
-  border-radius: 14px;
-  margin: 12px 16px;
-  box-shadow: var(--shadow);
+  border-radius: var(--radius-lg);
+  margin: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+  border: 1px solid var(--border);
   overflow: hidden;
+  transition: transform 0.15s ease;
 }
+.card:active { transform: scale(0.985); }
 .card-header {
-  padding: 16px 18px;
-  font-weight: 600;
-  font-size: 15px;
+  padding: 18px 20px;
+  font-weight: 700;
+  font-size: 16px;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -412,7 +422,7 @@ video.exercise-video {
   cursor: pointer;
 }
 .resume-banner {
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark, #1565c0));
+  background: var(--primary);
   color: white;
   border-radius: 14px;
   padding: 16px;
@@ -452,8 +462,8 @@ video.exercise-video {
 
 /* Exercise display in training mode */
 .tm-exercise-name {
-  font-size: 28px;
-  font-weight: 700;
+  font-size: 32px;
+  font-weight: 900;
   color: var(--primary);
   margin-bottom: 4px;
 }
@@ -506,8 +516,8 @@ video.exercise-video {
 
 /* Timer display in training mode */
 .tm-timer {
-  font-size: 72px;
-  font-weight: 700;
+  font-size: 80px;
+  font-weight: 900;
   font-variant-numeric: tabular-nums;
   color: var(--primary);
   margin-bottom: 12px;
@@ -526,17 +536,18 @@ video.exercise-video {
   max-width: 320px;
   padding: 18px 24px;
   border: none;
-  border-radius: 14px;
-  font-size: 18px;
+  border-radius: 50px;
+  font-size: 17px;
   font-weight: 700;
   cursor: pointer;
   margin-bottom: 12px;
-  transition: transform 0.1s;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  letter-spacing: -0.2px;
 }
-.tm-btn:active { transform: scale(0.97); }
+.tm-btn:active { transform: scale(0.96); opacity: 0.9; }
 .tm-btn-primary { background: var(--primary); color: white; }
 .tm-btn-success { background: var(--success); color: white; }
-.tm-btn-accent { background: var(--accent); color: white; }
+.tm-btn-accent { background: var(--accent); color: #1E293B; }
 .tm-btn-outline {
   background: var(--card);
   color: var(--primary);
@@ -647,21 +658,25 @@ video.exercise-video {
   background: var(--card);
   border-top: 1px solid var(--border);
   display: flex;
+  padding: 6px 8px;
   padding-bottom: max(8px, env(safe-area-inset-bottom));
   z-index: 100;
 }
 .nav-item {
   flex: 1;
   display: flex; flex-direction: column; align-items: center;
-  padding: 10px 0;
+  padding: 8px 0;
   cursor: pointer;
   color: var(--text-light);
-  font-size: 11px;
-  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  gap: 4px;
   border: none;
   background: none;
+  border-radius: 12px;
+  transition: all 0.2s ease;
 }
-.nav-item.active { color: var(--primary); }
+.nav-item.active { color: var(--primary); background: var(--info-bg); }
 .nav-item .nav-icon { font-size: 22px; }
 
 /* ================================================================
@@ -736,18 +751,19 @@ video.exercise-video {
   background: var(--primary);
   color: white;
   border: none;
-  border-radius: 12px;
+  border-radius: 50px;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
+  transition: transform 0.15s ease;
 }
-.save-btn:active { transform: scale(0.98); opacity: 0.9; }
+.save-btn:active { transform: scale(0.97); opacity: 0.9; }
 
 /* ================================================================
    WELCOME / HINTS
    ================================================================ */
 .welcome-banner {
-  background: linear-gradient(135deg, var(--success), #2ECC71);
+  background: var(--success);
   color: white;
   padding: 14px 20px;
   font-size: 14px;
@@ -793,19 +809,21 @@ video.exercise-video {
 .start-training-btn {
   display: block;
   width: calc(100% - 32px);
-  margin: 16px auto;
+  margin: 20px auto;
   padding: 18px;
   background: var(--success);
   color: white;
   border: none;
-  border-radius: 14px;
+  border-radius: 50px;
   font-size: 17px;
   font-weight: 700;
   cursor: pointer;
   text-align: center;
-  box-shadow: 0 4px 12px rgba(39,174,96,0.3);
+  box-shadow: 0 4px 16px rgba(141,198,63,0.25);
+  transition: transform 0.15s ease;
+  letter-spacing: -0.2px;
 }
-.start-training-btn:active { transform: scale(0.98); }
+.start-training-btn:active { transform: scale(0.96); }
 
 /* ================================================================
    AGENDA / PLANNING
@@ -1069,7 +1087,7 @@ video.exercise-video {
 
 /* Motivation strip */
 .motivation-strip {
-  background: linear-gradient(135deg, var(--primary), var(--accent));
+  background: var(--primary);
   color: white; padding: 10px 16px; border-radius: 12px;
   margin: 12px 16px; font-size: 13px; font-weight: 600;
   text-align: center; letter-spacing: 0.3px;

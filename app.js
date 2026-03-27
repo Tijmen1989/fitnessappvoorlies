@@ -84,6 +84,35 @@ function playTimerSound(type) {
   } catch(e) { /* AudioContext not supported */ }
 }
 
+function playBeep(frequency, duration) {
+  try {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var osc = _audioCtx.createOscillator();
+    var gain = _audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(_audioCtx.destination);
+    osc.frequency.value = frequency || 880;
+    gain.gain.value = 0.15;
+    osc.start();
+    osc.stop(_audioCtx.currentTime + (duration || 0.15));
+  } catch(e) {}
+}
+
+function hapticFeedback(pattern) {
+  // pattern: 'light' (tap), 'medium' (timer done), 'heavy' (training done)
+  if (navigator.vibrate) {
+    if (pattern === 'light') navigator.vibrate(20);
+    else if (pattern === 'medium') navigator.vibrate([200, 100, 200]);
+    else if (pattern === 'heavy') navigator.vibrate([200, 100, 200, 100, 200]);
+    else navigator.vibrate(pattern);
+  } else {
+    // iOS fallback: short beep
+    if (pattern === 'light') playBeep(880, 0.05);
+    else if (pattern === 'medium') playBeep(660, 0.2);
+    else if (pattern === 'heavy') { playBeep(880, 0.15); setTimeout(function() { playBeep(1100, 0.2); }, 200); }
+  }
+}
+
 // ================================================================
 // DATE & WEEK HELPERS
 // ================================================================
@@ -842,7 +871,7 @@ document.addEventListener('visibilitychange', function() {
           tmTimerSeconds = Math.max(0, _bgTmTimerAtHide - elapsed);
           if (tmTimerSeconds <= 0) {
             clearInterval(tmTimerInterval);
-            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            hapticFeedback('medium');
             playTimerSound('double');
             if (tmState === 'warmup-timer') { tmState = 'idle'; finishWarmup(); }
             else if (tmState === 'resting') { tmState = 'idle'; renderTrainingStep(); }
@@ -881,6 +910,10 @@ var totalSets = 3;
 var tmTimerInterval = null;
 var tmTimerSeconds = 0;
 var tmTimerEndTime = 0; // absolute end time for robust timer
+var _timerStartTime = 0;
+var _timerTotalSeconds = 0;
+var _dailyTimerStartTime = 0;
+var _dailyTimerTotalSeconds = 0;
 var tmState = 'idle'; // idle, set, resting
 var sessionExerciseLog = {};
 var _lastActivityTime = Date.now();
@@ -987,12 +1020,15 @@ function resumeFromPause() {
   else if (tmState === 'resting') startRestTimer();
   else if (tmState === 'plank-timer') {
     clearInterval(tmTimerInterval);
+    _timerStartTime = Date.now();
+    _timerTotalSeconds = tmTimerSeconds;
     tmTimerInterval = setInterval(function() {
-      tmTimerSeconds--;
+      var elapsed = Math.floor((Date.now() - _timerStartTime) / 1000);
+      tmTimerSeconds = Math.max(0, _timerTotalSeconds - elapsed);
       var display = document.getElementById('tmTimerDisplay');
       if (display) display.textContent = formatTimer(tmTimerSeconds);
-      if (tmTimerSeconds <= 0) { clearInterval(tmTimerInterval); if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]); playTimerSound('double'); tmState = 'idle'; completeSet(); }
-    }, 1000);
+      if (tmTimerSeconds <= 0) { clearInterval(tmTimerInterval); hapticFeedback('heavy'); playTimerSound('double'); tmState = 'idle'; completeSet(); }
+    }, 500);
   }
   else if (tmState === 'cooldown-timer') startCooldownTimer();
   else renderTrainingStep();
@@ -1326,18 +1362,21 @@ function startWarmupTimer(minutes) {
   tmState = 'warmup-timer';
   tmTimerSeconds = minutes * 60;
   clearInterval(tmTimerInterval);
+  _timerStartTime = Date.now();
+  _timerTotalSeconds = tmTimerSeconds;
   renderWarmupScreen();
   tmTimerInterval = setInterval(function() {
-    tmTimerSeconds--;
+    var elapsed = Math.floor((Date.now() - _timerStartTime) / 1000);
+    tmTimerSeconds = Math.max(0, _timerTotalSeconds - elapsed);
     var display = document.getElementById('tmTimerDisplay');
     if (display) display.textContent = formatTimer(tmTimerSeconds);
     if (tmTimerSeconds <= 0) {
       clearInterval(tmTimerInterval);
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+      hapticFeedback('heavy');
       playTimerSound('double');
       finishWarmup();
     }
-  }, 1000);
+  }, 500);
 }
 
 function finishWarmup() {
@@ -1435,17 +1474,20 @@ function startCooldownTimer() {
   tmTimerSeconds = 5 * 60;
   renderCooldownScreen();
   clearInterval(tmTimerInterval);
+  _timerStartTime = Date.now();
+  _timerTotalSeconds = tmTimerSeconds;
   tmTimerInterval = setInterval(function() {
-    tmTimerSeconds--;
+    var elapsed = Math.floor((Date.now() - _timerStartTime) / 1000);
+    tmTimerSeconds = Math.max(0, _timerTotalSeconds - elapsed);
     var display = document.getElementById('tmTimerDisplay');
     if (display) display.textContent = formatTimer(tmTimerSeconds);
     if (tmTimerSeconds <= 0) {
       clearInterval(tmTimerInterval);
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+      hapticFeedback('heavy');
       playTimerSound('double');
       finishCooldownWalking();
     }
-  }, 1000);
+  }, 500);
 }
 
 function finishCooldownWalking() {
@@ -1462,18 +1504,21 @@ function startCooldownStretchTimer(seconds) {
   tmTimerSeconds = seconds;
   renderCooldownScreen();
   clearInterval(tmTimerInterval);
+  _timerStartTime = Date.now();
+  _timerTotalSeconds = tmTimerSeconds;
   tmTimerInterval = setInterval(function() {
-    tmTimerSeconds--;
+    var elapsed = Math.floor((Date.now() - _timerStartTime) / 1000);
+    tmTimerSeconds = Math.max(0, _timerTotalSeconds - elapsed);
     var display = document.getElementById('tmTimerDisplay');
     if (display) display.textContent = tmTimerSeconds;
     if (tmTimerSeconds <= 0) {
       clearInterval(tmTimerInterval);
-      if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
+      hapticFeedback('light');
       playTimerSound('short');
       tmState = 'idle';
       advanceCooldownStretch();
     }
-  }, 1000);
+  }, 500);
 }
 
 function skipCooldownStretch() {
@@ -1518,18 +1563,21 @@ function startPlankTimer(seconds) {
   tmTimerSeconds = seconds;
   renderTrainingStep();
   clearInterval(tmTimerInterval);
+  _timerStartTime = Date.now();
+  _timerTotalSeconds = tmTimerSeconds;
   tmTimerInterval = setInterval(function() {
-    tmTimerSeconds--;
+    var elapsed = Math.floor((Date.now() - _timerStartTime) / 1000);
+    tmTimerSeconds = Math.max(0, _timerTotalSeconds - elapsed);
     var display = document.getElementById('tmTimerDisplay');
     if (display) display.textContent = formatTimer(tmTimerSeconds);
     if (tmTimerSeconds <= 0) {
       clearInterval(tmTimerInterval);
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+      hapticFeedback('heavy');
       playTimerSound('double');
       tmState = 'idle';
       completeSet();
     }
-  }, 1000);
+  }, 500);
 }
 
 function completeSet() {
@@ -1542,8 +1590,8 @@ function completeSet() {
   if (!ex.isPlank) {
     var wEl = document.getElementById('tmWeight');
     var rEl = document.getElementById('tmReps');
-    var w = wEl ? (parseFloat(wEl.value) || 0) : 0;
-    var r = rEl ? (parseInt(rEl.value) || ex.defaultReps) : ex.defaultReps;
+    var w = Math.max(0, parseFloat(wEl.value) || 0);
+    var r = Math.max(1, parseInt(rEl.value) || ex.defaultReps);
     sessionExerciseLog[logKey] = { id: ex.id, weight: w, reps: r, done: true };
   } else {
     sessionExerciseLog[logKey] = { id: ex.id, weight: 0, reps: 0, done: true };
@@ -1599,20 +1647,21 @@ function getNextExercisePreview() {
 
 function startRestTimer() {
   clearInterval(tmTimerInterval);
-  tmTimerEndTime = Date.now() + tmTimerSeconds * 1000;
+  _timerStartTime = Date.now();
+  _timerTotalSeconds = tmTimerSeconds;
   tmTimerInterval = setInterval(function() {
-    var remaining = Math.ceil((tmTimerEndTime - Date.now()) / 1000);
-    tmTimerSeconds = Math.max(0, remaining);
+    var elapsed = Math.floor((Date.now() - _timerStartTime) / 1000);
+    tmTimerSeconds = Math.max(0, _timerTotalSeconds - elapsed);
     var display = document.getElementById('tmTimerDisplay');
     if (display) display.textContent = formatTimer(tmTimerSeconds);
 
     if (tmTimerSeconds <= 0) {
       clearInterval(tmTimerInterval);
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      hapticFeedback('medium');
       playTimerSound('short');
       skipRest();
     }
-  }, 1000);
+  }, 500);
 }
 
 function skipRest() {
@@ -1633,8 +1682,9 @@ function skipRest() {
 }
 
 function addRestTime(secs) {
-  tmTimerSeconds += secs;
-  tmTimerEndTime += secs * 1000;
+  _timerTotalSeconds += secs;
+  var elapsed = Math.floor((Date.now() - _timerStartTime) / 1000);
+  tmTimerSeconds = Math.max(0, _timerTotalSeconds - elapsed);
   var display = document.getElementById('tmTimerDisplay');
   if (display) display.textContent = formatTimer(tmTimerSeconds);
 }
@@ -1824,7 +1874,7 @@ function renderFeedbackForm() {
   return html;
 }
 
-var selectedFeedback = { energy: null, calf: null };
+var selectedFeedback = { energy: null };
 
 function selectFeedback(groupId, value, btn) {
   var group = document.getElementById(groupId);
@@ -1837,7 +1887,6 @@ function selectFeedback(groupId, value, btn) {
   btn.style.borderColor = 'var(--primary)';
   btn.style.background = 'rgba(27,79,114,0.1)';
   if (groupId === 'feedbackEnergy') selectedFeedback.energy = value;
-  if (groupId === 'feedbackCalf') selectedFeedback.calf = value;
 }
 
 function saveFeedbackAndClose() {
@@ -1848,19 +1897,18 @@ function saveFeedbackAndClose() {
     if (sessions[i].date === todayKey) {
       sessions[i].feedback = {
         energy: selectedFeedback.energy,
-        calfPain: selectedFeedback.calf,
         note: note || null
       };
       break;
     }
   }
   setStore('sessions', sessions);
-  selectedFeedback = { energy: null, calf: null };
+  selectedFeedback = { energy: null };
   closeCompletionScreen();
 }
 
 function closeCompletionScreen() {
-  selectedFeedback = { energy: null, calf: null };
+  selectedFeedback = { energy: null };
   document.getElementById('trainingMode').classList.remove('active');
   document.getElementById('bottomNav').style.display = 'flex';
   document.body.style.overflow = '';
@@ -1876,14 +1924,13 @@ function saveFeedbackAndStartWandelen() {
     if (sessions[i].date === todayKey) {
       sessions[i].feedback = {
         energy: selectedFeedback.energy,
-        calfPain: selectedFeedback.calf,
         note: note || null
       };
       break;
     }
   }
   setStore('sessions', sessions);
-  selectedFeedback = { energy: null, calf: null };
+  selectedFeedback = { energy: null };
 
   // Close kracht completion and start loopband
   document.getElementById('trainingMode').classList.remove('active');
@@ -2072,12 +2119,22 @@ function renderCardioTimerStep() {
 
 function startCardioCountdown() {
   clearInterval(cardioTimerInterval);
+  var cardioStartTime = Date.now();
+  var cardioStartPhaseSeconds = cardioPhaseSeconds;
+  var cardioStartIntervalSeconds = intervalSecondsLeft;
+  var lastPhaseElapsed = 0;
   cardioTimerInterval = setInterval(function() {
-    cardioPhaseSeconds--;
+    var elapsed = Math.floor((Date.now() - cardioStartTime) / 1000);
+    var delta = elapsed - lastPhaseElapsed;
+    if (delta <= 0) return;
+    lastPhaseElapsed = elapsed;
+
+    cardioPhaseSeconds = Math.max(0, cardioStartPhaseSeconds - elapsed);
 
     // Auto-interval mode: also tick the interval segment
     if (intervalIsAutoMode) {
-      intervalSecondsLeft--;
+      var prevMode = cardioIntervalMode;
+      intervalSecondsLeft = Math.max(0, intervalSecondsLeft - delta);
 
       // Update interval display
       var intervalDisplay = document.getElementById('intervalTimerDisplay');
@@ -2087,19 +2144,21 @@ function startCardioCountdown() {
       var phaseDisplay = document.getElementById('cardioTimerDisplay');
       if (phaseDisplay) phaseDisplay.textContent = formatTimer(cardioPhaseSeconds);
 
-      // Interval segment ended — switch mode
-      if (intervalSecondsLeft <= 0 && cardioPhaseSeconds > 0) {
+      // Interval segment ended — switch mode (while loop handles large deltas after tab switch)
+      while (intervalSecondsLeft <= 0 && cardioPhaseSeconds > 0) {
         if (cardioIntervalMode === 'fast') {
           cardioIntervalMode = 'slow';
-          intervalSecondsLeft = Math.min(cardioIntervalConfig.slow, cardioPhaseSeconds);
+          intervalSecondsLeft += cardioIntervalConfig.slow;
           intervalTotalCycles++;
         } else {
           cardioIntervalMode = 'fast';
-          intervalSecondsLeft = Math.min(cardioIntervalConfig.fast, cardioPhaseSeconds);
+          intervalSecondsLeft += cardioIntervalConfig.fast;
         }
-        // Vibrate on switch
-        if (navigator.vibrate) navigator.vibrate(cardioIntervalMode === 'fast' ? [300, 100, 300] : [150]);
-        playTimerSound('short');
+      }
+      // Did a mode switch actually happen?
+      if (cardioIntervalMode !== prevMode && cardioPhaseSeconds > 0) {
+        intervalSecondsLeft = Math.min(intervalSecondsLeft, cardioPhaseSeconds);
+        hapticFeedback(cardioIntervalMode === 'fast' ? 'heavy' : 'light');
         renderCardioTimerStep();
         return;
       }
@@ -2111,11 +2170,11 @@ function startCardioCountdown() {
 
     // Phase ended
     if (cardioPhaseSeconds <= 0) {
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      hapticFeedback('medium');
       playTimerSound('short');
       advanceCardioPhase();
     }
-  }, 1000);
+  }, 500);
 }
 
 function advanceCardioPhase() {
@@ -2176,7 +2235,7 @@ function completeCardioSession() {
   setStore('sessions', sessions);
 
   // Show completion
-  selectedFeedback = { energy: null, calf: null };
+  selectedFeedback = { energy: null };
   var body = document.getElementById('tmBody');
 
   var html = '<div class="completion-screen">';
@@ -2755,37 +2814,58 @@ function renderToday() {
 
 function renderRestDay(container, dayOfWeek, motivHtml) {
   var isCycling = [1,4].includes(dayOfWeek);
-  var html = (motivHtml || '') + '<div class="card" style="padding-bottom:4px"><div class="rest-day-msg" style="padding:12px 16px 8px">';
-  html += '<div style="font-size:32px;margin-bottom:4px">' + (isCycling ? '\uD83D\uDEB4' : '\uD83D\uDE0C') + '</div>';
-  html += '<h2 style="margin:0 0 4px;font-size:18px">' + (isCycling ? 'Fietsdag' : 'Rustdag') + '</h2>';
-  if (isCycling) {
-    html += '<p style="margin:0 0 8px;font-size:13px">Vandaag fiets je naar school en terug \u2014 dat is al \u00b130 min cardio.</p>';
-    html += '<div style="text-align:left;padding:8px 12px;background:var(--hint-bg);border-radius:8px;font-size:12px;color:var(--text);line-height:1.4">';
-    html += '\uD83D\uDEB6 <strong>Beweegadvies:</strong> Probeer ook 20\u201330 min te wandelen (\u00b12.000\u20133.000 stappen). Bijv. een rondje met Milou.';
-    html += '</div>';
-  } else {
-    html += '<p style="margin:0 0 8px;font-size:13px">Licht bewegen of stretchen helpt je lichaam sneller herstellen.</p>';
-    html += '<div style="text-align:left;padding:8px 12px;background:var(--hint-bg);border-radius:8px;font-size:12px;color:var(--text);line-height:1.4">';
-    html += '\uD83D\uDEB6 <strong>Beweegadvies:</strong> Probeer 30\u201345 min te wandelen (\u00b13.000\u20134.500 stappen). Goed voor herstel en vetverbranding.';
-    html += '</div>';
-  }
-  html += '</div></div>';
+  var html = (motivHtml || '');
 
-  // Slimme rustdag-tips op basis van recente data
+  // Clean header
+  html += '<div style="padding:24px 20px 16px;text-align:center">';
+  html += '<div style="font-size:40px;margin-bottom:8px">' + (isCycling ? '\uD83D\uDEB4' : '\uD83D\uDE0C') + '</div>';
+  html += '<h2 style="margin:0 0 6px;font-size:22px;font-weight:800;letter-spacing:-0.5px;color:var(--text)">' + (isCycling ? 'Fietsdag' : 'Rustdag') + '</h2>';
+  html += '<p style="margin:0;font-size:14px;color:var(--text-light)">' + (isCycling ? 'Fietsen naar school = \u00b130 min cardio' : 'Herstel is minstens zo belangrijk als trainen') + '</p>';
+  html += '</div>';
+
+  // Slimme rustdag-tips
   var smartTip = getSmartRestDayTip(dayOfWeek, isCycling);
   if (smartTip) {
     html += '<div class="recovery-warning">' + smartTip + '</div>';
   }
 
-  // Loopband knop
-  html += '<div style="margin:8px 16px">';
-  html += '<button class="start-btn-primary" onclick="startLoopbandWandelen()" style="width:100%;margin:0;padding:10px;font-size:13px">\uD83D\uDEB6 Loopband wandelen</button>';
+  // === Modern action cards ===
+  var routineCompleted = getStore('dailyRoutineCompleted_' + getTodayKey(), false);
+
+  // Card 1: Dagelijkse routine
+  html += '<div onclick="' + (routineCompleted ? '' : 'startDailyRoutine()') + '" style="margin:8px 16px;padding:16px 18px;background:var(--card);border-radius:16px;border:1px solid var(--border);display:flex;align-items:center;gap:14px;' + (routineCompleted ? '' : 'cursor:pointer') + '">';
+  html += '<div style="width:44px;height:44px;border-radius:12px;background:' + (routineCompleted ? 'var(--success-bg)' : 'var(--info-bg)') + ';display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">' + (routineCompleted ? '\u2705' : '\uD83E\uDDD8') + '</div>';
+  html += '<div style="flex:1;min-width:0">';
+  html += '<div style="font-weight:700;font-size:15px;color:var(--text)">' + (routineCompleted ? 'Routine voltooid!' : 'Dagelijkse routine') + '</div>';
+  html += '<div style="font-size:13px;color:var(--text-light);margin-top:2px">' + (routineCompleted ? 'Core & mobiliteit gedaan' : DAILY_ROUTINE.length + ' oefeningen \u00b7 10\u201315 min') + '</div>';
+  html += '</div>';
+  if (!routineCompleted) html += '<div style="color:var(--text-light);font-size:18px;flex-shrink:0">\u203A</div>';
   html += '</div>';
 
-  // Kuit-tips op fietsdagen (compact)
+  // Card 2: Stretchen
+  html += '<div onclick="startStretchTimer()" style="margin:8px 16px;padding:16px 18px;background:var(--card);border-radius:16px;border:1px solid var(--border);display:flex;align-items:center;gap:14px;cursor:pointer">';
+  html += '<div style="width:44px;height:44px;border-radius:12px;background:var(--success-bg);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">\uD83E\uDDD8\u200D\u2640\uFE0F</div>';
+  html += '<div style="flex:1;min-width:0">';
+  html += '<div style="font-weight:700;font-size:15px;color:var(--text)">Stretch routine</div>';
+  html += '<div style="font-size:13px;color:var(--text-light);margin-top:2px">' + STRETCH_ROUTINES.length + ' stretches \u00b7 \u00b15 min</div>';
+  html += '</div>';
+  html += '<div style="color:var(--text-light);font-size:18px;flex-shrink:0">\u203A</div>';
+  html += '</div>';
+
+  // Card 3: Loopband wandelen
+  html += '<div onclick="startLoopbandWandelen()" style="margin:8px 16px;padding:16px 18px;background:var(--card);border-radius:16px;border:1px solid var(--border);display:flex;align-items:center;gap:14px;cursor:pointer">';
+  html += '<div style="width:44px;height:44px;border-radius:12px;background:var(--warning-bg);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">\uD83D\uDEB6</div>';
+  html += '<div style="flex:1;min-width:0">';
+  html += '<div style="font-weight:700;font-size:15px;color:var(--text)">Wandelen</div>';
+  html += '<div style="font-size:13px;color:var(--text-light);margin-top:2px">' + (isCycling ? '20\u201330 min \u00b7 rondje met Milou' : '30\u201345 min \u00b7 goed voor herstel') + '</div>';
+  html += '</div>';
+  html += '<div style="color:var(--text-light);font-size:18px;flex-shrink:0">\u203A</div>';
+  html += '</div>';
+
+  // Kuit-tips op fietsdagen
   if (isCycling) {
     html += '<div style="margin:4px 16px">';
-    html += '<button onclick="toggleKuitTips(this)" style="background:none;border:none;color:var(--primary-light);font-size:12px;cursor:pointer;padding:4px 0">\uD83E\uDDB5 Tips tegen kuitpijn \u25BC</button>';
+    html += '<button onclick="toggleKuitTips(this)" style="background:none;border:none;color:var(--primary);font-size:13px;font-weight:600;cursor:pointer;padding:4px 0">\uD83E\uDDB5 Tips tegen kuitpijn \u25BC</button>';
     html += '<div class="kuit-tips-body" style="display:none;margin-top:6px;font-size:12px;color:var(--text-light);line-height:1.5">';
     html += '<p style="margin:0 0 4px"><strong>Zadelhoogte:</strong> Hiel op pedaal \u2192 been net gestrekt.</p>';
     html += '<p style="margin:0 0 4px"><strong>Voetpositie:</strong> Trap met de bal van je voet.</p>';
@@ -2794,28 +2874,11 @@ function renderRestDay(container, dayOfWeek, motivHtml) {
     html += '</div></div>';
   }
 
-  // Stretch routine (direct zichtbaar op rustdagen)
-  html += '<div id="stretchRoutineCompact" style="margin:8px 16px">';
-  html += '<div class="card" style="margin:0">';
-  STRETCH_ROUTINES.forEach(function(s, idx) {
-    html += '<div style="padding:8px 12px;border-top:' + (idx === 0 ? 'none' : '1px solid var(--border)') + ';display:flex;align-items:center;gap:8px">';
-    html += '<span style="font-size:12px;font-weight:700;color:var(--primary);min-width:16px">' + (idx + 1) + '</span>';
-    html += '<div style="flex:1;font-size:13px">' + s.name + ' <span style="color:var(--text-light)">(' + s.duur + 's' + (s.perKant ? '/kant' : '') + ')</span></div>';
-    html += '<button onclick="toggleStretchDetail(\'' + s.id + '\')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--primary);cursor:pointer">?</button>';
-    html += '</div>';
-    html += '<div id="stretchDetail_' + s.id + '" style="display:none;padding:4px 12px 8px 36px">';
-    if (s.videoUrl) {
-      html += '<div style="margin-bottom:4px"><video class="exercise-video" src="' + s.videoUrl + '" loop muted playsinline preload="none" onerror="this.parentElement.style.display=\'none\'" onloadeddata="this.classList.add(\'loaded\');this.play().catch(function(){})"></video></div>';
-    }
-    html += '<p style="font-size:12px;color:var(--text-light);line-height:1.4;margin:0">' + s.instruction + '</p>';
-    html += '</div>';
-  });
-  html += '<div style="padding:8px 12px;border-top:1px solid var(--border)">';
-  html += '<button class="start-btn-primary" onclick="startStretchTimer()" style="width:100%;margin:0;padding:8px;font-size:13px">Start stretch timer (\u00b15 min)</button>';
+  // Vrije training — subtle link
+  html += '<div style="text-align:center;padding:20px 16px 32px">';
+  html += '<button onclick="openVrijeTraining()" style="background:none;border:none;color:var(--primary);font-size:14px;font-weight:600;cursor:pointer;padding:8px 20px">Toch zin om te trainen? \u2192</button>';
   html += '</div>';
-  html += '</div></div>';
 
-  html += '<button class="vrije-training-btn" onclick="openVrijeTraining()" style="margin:8px 16px;padding:10px;font-size:13px">Toch zin om te trainen?</button>';
   container.innerHTML = html;
 }
 
@@ -3213,7 +3276,7 @@ function startStretchCountdown(seconds) {
     if (display) display.textContent = remaining;
     if (remaining <= 0) {
       clearInterval(stretchTimerInterval);
-      if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
+      hapticFeedback('light');
       playTimerSound('short');
       advanceStretchStep();
     }
@@ -4906,7 +4969,7 @@ function calcStreak(sessions) {
   var streak = 0;
   for (var w = 0; w < 52; w++) {
     var weekStart = new Date(now);
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay() - (w * 7));
+    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7) - (w * 7));
     weekStart.setHours(0,0,0,0);
     var weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 7);
@@ -4928,7 +4991,9 @@ function countThisWeek(sessions) {
   var monday = new Date(now);
   monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
   monday.setHours(0,0,0,0);
-  return sessions.filter(function(s) { return new Date(s.date) >= monday; }).length;
+  var sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 7);
+  return sessions.filter(function(s) { var d = new Date(s.date); return d >= monday && d < sunday; }).length;
 }
 
 function calcAvgEnergy(sessions) {
@@ -5042,8 +5107,8 @@ function editMeasurement(idx) {
   var newHip = prompt('Heupomtrek (cm) — laat leeg om over te slaan:', m.hip || '');
 
   measurements[idx].weight = newWeight;
-  measurements[idx].waist = newWaist ? parseFloat(newWaist) : null;
-  measurements[idx].hip = newHip ? parseFloat(newHip) : null;
+  measurements[idx].waist = newWaist ? (parseFloat(newWaist) || null) : null;
+  measurements[idx].hip = newHip ? (parseFloat(newHip) || null) : null;
 
   setStore('measurements', measurements);
   renderHistory();
