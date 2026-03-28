@@ -507,8 +507,8 @@ var STRETCH_ROUTINES = [
 function getSchedule(weekType) {
   var base = {
     2: 'loopbandWandelen',    // Dinsdag
-    3: 'krachtOnder',         // Woensdag
-    6: 'krachtBoven'          // Zaterdag
+    3: 'krachtOnder',         // Woensdag (benen/onderlichaam)
+    6: 'krachtBoven'          // Zaterdag (armen/bovenlichaam)
   };
   if (weekType === 'B') {
     base[5] = 'cardioLicht';  // Vrijdag (alleen Week B)

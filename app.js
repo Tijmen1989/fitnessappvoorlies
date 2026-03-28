@@ -221,6 +221,63 @@ function daysSinceLastTraining() {
 }
 
 // ================================================================
+// MISSED TRAINING CATCH-UP
+// ================================================================
+function getMissedTrainings() {
+  var now = new Date();
+  var dayOfWeek = now.getDay(); // 0=zo, 1=ma, ..., 6=za
+  var weekType = getWeekType();
+  var schedule = getSchedule(weekType);
+  var sessions = getStore('sessions', []);
+  var missed = [];
+
+  // Loop door alle dagen eerder deze week (ma t/m gisteren)
+  for (var d = 1; d < dayOfWeek; d++) {
+    var scheduledKey = schedule[d];
+    if (!scheduledKey) continue;
+    // Alleen krachttrainingen (cardio/loopband missen is minder erg)
+    if (!TRAINING_DATA[scheduledKey] || TRAINING_DATA[scheduledKey].type !== 'kracht') continue;
+
+    // Bereken de datum van die dag
+    var dayDate = new Date(now);
+    dayDate.setDate(dayDate.getDate() - (dayOfWeek - d));
+    var dayKey = dayDate.getFullYear() + '-' + String(dayDate.getMonth()+1).padStart(2,'0') + '-' + String(dayDate.getDate()).padStart(2,'0');
+
+    // Check of er een sessie is met deze trainingKey op die dag (of later deze week)
+    var wasDone = sessions.some(function(s) {
+      var sDate = new Date(s.date);
+      var sDay = sDate.getDay();
+      // Check of deze training ergens deze week is gedaan
+      var monday = new Date(now);
+      monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+      monday.setHours(0,0,0,0);
+      return s.trainingKey === scheduledKey && sDate >= monday;
+    });
+
+    if (!wasDone) {
+      missed.push({
+        trainingKey: scheduledKey,
+        scheduledDay: d,
+        name: TRAINING_DATA[scheduledKey].name || scheduledKey
+      });
+    }
+  }
+  return missed;
+}
+
+function applyCatchUpSwap(missedKey) {
+  // Sla de swap op: vandaag doen we de gemiste training
+  setStore('catchUpToday', { trainingKey: missedKey, date: getTodayKey() });
+  renderToday();
+}
+
+function skipCatchUp() {
+  // Gebruiker wil gewoon de normale training doen
+  setStore('catchUpToday', { skipped: true, date: getTodayKey() });
+  renderToday();
+}
+
+// ================================================================
 // SMART RECOVERY
 // ================================================================
 function getRecoveryStatus() {
@@ -423,6 +480,12 @@ function getExerciseHistory(exerciseId) {
 function getLastWeight(exerciseId) {
   var hist = getExerciseHistory(exerciseId);
   return hist.length > 0 ? hist[0].weight : 0;
+}
+
+function getLastSession(exerciseId) {
+  var hist = getExerciseHistory(exerciseId);
+  if (hist.length === 0) return null;
+  return { weight: hist[0].weight, reps: hist[0].reps, date: hist[0].date };
 }
 
 function isDumbbell(exerciseId) {
@@ -658,6 +721,39 @@ function getSmartWeightOptions(exerciseId, currentWeight, step) {
   }
 
   return vals;
+}
+
+function getAllWeightOptions(exerciseId, step) {
+  var currentWeight = getLastWeight(exerciseId);
+  var progression = getProgressionSuggestion(exerciseId);
+  var suggestedWeight = progression ? progression.suggested : 0;
+  var options = [];
+
+  if (isDumbbell(exerciseId)) {
+    var available = getAvailableWeights(exerciseId);
+    for (var i = 0; i < available.length; i++) {
+      options.push({ value: available[i], isSuggestion: available[i] === suggestedWeight && suggestedWeight > currentWeight });
+    }
+    return options;
+  }
+
+  var machineWeights = getStore('availableWeights', {});
+  var customList = machineWeights[exerciseId];
+  if (customList && customList.length > 0) {
+    for (var j = 0; j < customList.length; j++) {
+      options.push({ value: customList[j], isSuggestion: customList[j] === suggestedWeight && suggestedWeight > currentWeight });
+    }
+    return options;
+  }
+
+  var unit = getWeightUnit(exerciseId);
+  var fStep = step > 0 ? step : (unit === 'lbs' ? 10 : 5);
+  var maxW = unit === 'lbs' ? 200 : 120;
+  for (var fi = fStep; fi <= maxW; fi += fStep) {
+    var val = parseFloat(fi.toFixed(1));
+    options.push({ value: val, isSuggestion: val === suggestedWeight && suggestedWeight > currentWeight });
+  }
+  return options;
 }
 
 function selectWeight(value, btn) {
@@ -1192,10 +1288,14 @@ function renderTrainingStep() {
 
   var unit = getWeightUnit(exId);
 
+  var lastSession = getLastSession(exId);
   if (progression) {
     html += '<div class="tm-suggestion" style="color:' + (progression.ready ? 'var(--success)' : 'var(--text-light)') + '">' + progression.message + '</div>';
-  } else if (prevWeight > 0) {
-    html += '<div class="tm-prev-weight">Vorige: ' + prevWeight + ' ' + unit + '</div>';
+  } else if (lastSession && lastSession.weight > 0) {
+    html += '<div class="tm-prev-badge">';
+    html += '<span class="tm-prev-label">Vorige keer</span>';
+    html += '<span class="tm-prev-value">' + ('' + lastSession.weight).replace('.', ',') + ' ' + unit + ' \u00b7 ' + (lastSession.reps || '?') + ' reps</span>';
+    html += '</div>';
   }
 
   if (!ex.isPlank) {
@@ -1216,28 +1316,29 @@ function renderTrainingStep() {
     var step = getWeightStep(exId);
     var repRange = parseRepRange(ex.reps);
 
-    // Weight picker (alleen voor oefeningen met gewicht, niet voor bodyweight)
+    // Weight picker — horizontale scroll strip
     if (!ex.isBodyweight) {
-      var weightOptions = getSmartWeightOptions(exId, defaultWeight, step);
-      html += '<div style="margin-bottom:16px;width:100%;max-width:340px">';
-      html += '<div style="font-size:12px;color:var(--text-light);margin-bottom:6px;text-align:center">Gewicht (' + unit + ')</div>';
-      html += '<div id="tmWeightPicker" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center">';
+      var weightOptions = getAllWeightOptions(exId, step);
+      html += '<div style="margin-bottom:16px;width:100%">';
+      html += '<div style="font-size:12px;color:var(--text-light);margin-bottom:6px;text-align:center">Gewicht (' + unit + ') — swipe voor meer</div>';
+      html += '<div id="tmWeightPicker" style="display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:8px 4px;scrollbar-width:none">';
       for (var wi = 0; wi < weightOptions.length; wi++) {
         var wo = weightOptions[wi];
         var isSelected = wo.value === defaultWeight;
         var isSuggestion = wo.isSuggestion;
         var btnStyle = isSelected
-          ? 'background:var(--primary);color:white;border-color:var(--primary)'
+          ? 'background:var(--primary);color:white;border-color:var(--primary);transform:scale(1.1)'
           : isSuggestion
             ? 'background:var(--hint-bg);color:var(--success-text);border-color:var(--success);border-style:dashed'
             : 'background:var(--card);color:var(--text);border-color:var(--border)';
         html += '<button onclick="selectWeight(' + wo.value + ',this)" data-weight="' + wo.value + '" ';
-        html += 'style="min-width:52px;padding:10px 6px;border:2px solid;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;' + btnStyle + '">';
+        html += 'style="min-width:56px;flex-shrink:0;padding:12px 8px;border:2px solid;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer;scroll-snap-align:center;transition:transform 0.15s,background 0.15s;' + btnStyle + '">';
         html += ('' + wo.value).replace('.', ',') + '</button>';
       }
       html += '</div>';
       html += '<input type="hidden" id="tmWeight" value="' + defaultWeight + '">';
       html += '</div>';
+      // auto-scroll happens after innerHTML is set (see renderExerciseStep end)
     } else {
       html += '<div style="margin-bottom:12px;font-size:13px;color:var(--text-light);text-align:center">Lichaamsgewicht \u2014 geen gewicht nodig</div>';
       html += '<input type="hidden" id="tmWeight" value="0">';
@@ -1306,6 +1407,15 @@ function renderTrainingStep() {
 
   body.innerHTML = html;
   document.getElementById('tmHeader').querySelector('h2').textContent = currentTraining.name;
+  // Auto-scroll weight picker naar geselecteerd gewicht
+  setTimeout(function() {
+    var picker = document.getElementById('tmWeightPicker');
+    if (!picker) return;
+    var weightEl = document.getElementById('tmWeight');
+    if (!weightEl) return;
+    var sel = picker.querySelector('[data-weight="' + weightEl.value + '"]');
+    if (sel) sel.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'auto' });
+  }, 50);
   initVideoObserver();
 }
 
@@ -1594,7 +1704,7 @@ function completeSet() {
   if (!ex.isPlank) {
     var wEl = document.getElementById('tmWeight');
     var rEl = document.getElementById('tmReps');
-    var w = Math.max(0, parseFloat(wEl.value) || 0);
+    var w = Math.max(0, parseFloat(String(wEl.value).replace(',', '.')) || 0);
     var r = Math.max(1, parseInt(rEl.value) || ex.defaultReps);
     sessionExerciseLog[logKey] = { id: ex.id, weight: w, reps: r, done: true };
   } else {
@@ -2761,12 +2871,39 @@ function resetSoreness() {
   renderToday();
 }
 
+function getRotatingGreeting() {
+  var greetings = [
+    'Hoi prachtige vrouw',
+    'Hey sexy babe',
+    'Hoi beautiful',
+    'Hey schoonheid',
+    'Hoi lekker ding',
+    'Hey powervrouw',
+    'Hoi stralende meid',
+    'Hey supergirl',
+    'Hoi gorgeous',
+    'Hey queen'
+  ];
+  var now = new Date();
+  var start = new Date(now.getFullYear(), 0, 0);
+  var dayOfYear = Math.floor((now - start) / 86400000);
+  return greetings[dayOfYear % greetings.length];
+}
+
 function renderToday() {
   var now = new Date();
   var weekType = getWeekType();
   var dayOfWeek = now.getDay();
   var schedule = getSchedule(weekType);
   var todayKey = getTodayKey();
+
+  // Rotating compliment in topbar
+  var topH1 = document.querySelector('.topbar h1');
+  if (topH1) {
+    var badge = document.getElementById('weekBadge');
+    topH1.textContent = getRotatingGreeting() + ' ';
+    if (badge) topH1.appendChild(badge);
+  }
 
   document.getElementById('weekBadge').textContent = 'Week ' + weekType;
   document.getElementById('topbarDate').textContent = formatDateNL(now);
@@ -2787,6 +2924,24 @@ function renderToday() {
     isPostponed = true;
   }
 
+  // ── Inhaal-logica: check op gemiste krachttrainingen deze week ──
+  var catchUp = getStore('catchUpToday', null);
+  var catchUpActive = false;
+  if (catchUp && catchUp.date === todayKey && catchUp.trainingKey) {
+    // Gebruiker heeft al gekozen: doe de gemiste training
+    trainingKey = catchUp.trainingKey;
+    catchUpActive = true;
+  }
+  var missed = getMissedTrainings();
+  var showCatchUpChoice = false;
+  if (missed.length > 0 && trainingKey && !catchUpActive && !isPostponed) {
+    // Er is een gemiste training EN er staat vandaag iets gepland
+    // Check of gebruiker al heeft gekozen (skipped)
+    if (!catchUp || catchUp.date !== todayKey || (!catchUp.skipped && !catchUp.trainingKey)) {
+      showCatchUpChoice = true;
+    }
+  }
+
   // Build motivation strip + weekly summary
   var motivHtml = '';
   if (hasPausedTraining()) {
@@ -2800,7 +2955,35 @@ function renderToday() {
     motivHtml += '</div>';
   }
 
-  motivHtml += renderWeekSummary() + renderProteinReminder() + renderSorenessCheck(trainingKey) + renderMotivationStrip();
+  // Toon inhaal-keuze als er gemiste training is
+  if (showCatchUpChoice) {
+    var missedT = missed[0];
+    var todayT = TRAINING_DATA[trainingKey];
+    var DAY_NAMES = ['zondag','maandag','dinsdag','woensdag','donderdag','vrijdag','zaterdag'];
+    motivHtml += '<div style="margin:12px 16px;padding:16px;background:var(--info-bg);border:1px solid var(--primary);border-radius:16px">';
+    motivHtml += '<div style="font-weight:700;font-size:15px;margin-bottom:6px">\uD83D\uDD04 Gemiste training inhalen?</div>';
+    motivHtml += '<div style="font-size:13px;color:var(--text-light);line-height:1.5;margin-bottom:14px">';
+    motivHtml += 'Je hebt <strong>' + missedT.name + '</strong> van ' + DAY_NAMES[missedT.scheduledDay] + ' gemist. Vandaag staat <strong>' + (todayT ? todayT.name : trainingKey) + '</strong> gepland. Wat wil je doen?';
+    motivHtml += '</div>';
+    motivHtml += '<div style="display:flex;gap:8px">';
+    motivHtml += '<button onclick="applyCatchUpSwap(\'' + missedT.trainingKey + '\')" style="flex:1;padding:12px;border-radius:50px;border:2px solid var(--primary);background:var(--primary);color:white;font-size:14px;font-weight:700;cursor:pointer">';
+    motivHtml += missedT.name + ' inhalen</button>';
+    motivHtml += '<button onclick="skipCatchUp()" style="flex:1;padding:12px;border-radius:50px;border:2px solid var(--border);background:var(--card);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">';
+    motivHtml += (todayT ? todayT.name : 'Gewoon') + ' doen</button>';
+    motivHtml += '</div>';
+    motivHtml += '</div>';
+  }
+
+  // Toon inhaal-banner als swap actief is
+  if (catchUpActive) {
+    var originalKey = schedule[dayOfWeek];
+    var originalName = (TRAINING_DATA[originalKey] ? TRAINING_DATA[originalKey].name : originalKey) || 'je geplande training';
+    motivHtml += '<div style="margin:8px 16px;padding:10px 16px;background:var(--success-bg);border:1px solid var(--success);border-radius:12px;font-size:13px;line-height:1.5">';
+    motivHtml += '\u2705 <strong>Inhaaltraining</strong> \u2014 je doet vandaag de gemiste training in plaats van ' + originalName + '.';
+    motivHtml += '</div>';
+  }
+
+  motivHtml += renderWeekSummary() + renderMotivationStrip();
 
   if (!trainingKey) {
     renderRestDay(content, dayOfWeek, motivHtml);
@@ -3406,12 +3589,14 @@ function renderDailyRoutineStep() {
       html += '<button class="tm-btn tm-btn-success" onclick="nextDailyRoutineExercise()">Voltooid</button>';
       html += '<button class="tm-btn tm-btn-outline" style="max-width:150px" onclick="addDailyRoutineTime(5)">+5s</button>';
     }
+    html += '<button class="tm-btn tm-btn-outline tm-btn-small" onclick="nextDailyRoutineExercise()" style="margin-top:4px">Overslaan</button>';
     html += '</div>';
   } else {
     html += '<div style="text-align:center;padding:12px 0">';
     html += '<div style="font-size:14px;color:var(--text-light);margin-bottom:8px">Voer ' + exercise.target + ' uit</div>';
     html += '</div>';
     html += '<button class="tm-btn tm-btn-success" onclick="nextDailyRoutineExercise()" style="width:100%;margin-top:16px;padding:12px">Voltooid</button>';
+    html += '<button class="tm-btn tm-btn-outline tm-btn-small" onclick="nextDailyRoutineExercise()" style="margin-top:4px">Overslaan</button>';
   }
 
   html += '</div>';
@@ -4054,11 +4239,11 @@ function renderProfile() {
   }
   var darkOn = getStore('darkMode', false);
   html += '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px">';
-  html += '<div style="display:flex;align-items:center;justify-content:space-between">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">';
   html += '<div><div style="font-weight:600;font-size:14px">Donkere modus</div>';
   html += '<div style="font-size:12px;color:var(--text-light)">Makkelijker voor je ogen in het donker</div></div>';
   html += '<label class="toggle-switch"><input type="checkbox" ' + (darkOn ? 'checked' : '') + ' onchange="toggleDarkMode()"><span class="toggle-slider"></span></label>';
-  html += '</div></div>';
+  html += '</div>';
   var remindersOn = getStore('remindersEnabled', false);
   html += '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px">';
   html += '<div style="display:flex;align-items:center;justify-content:space-between">';

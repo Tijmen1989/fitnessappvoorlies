@@ -486,6 +486,29 @@ video.exercise-video {
   border-radius: 10px;
   margin-bottom: 16px;
 }
+.tm-prev-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--info-bg);
+  border: 1px solid var(--primary);
+  border-radius: 50px;
+  padding: 8px 18px;
+  margin-bottom: 16px;
+}
+.tm-prev-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--primary);
+  white-space: nowrap;
+}
+.tm-prev-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
 .tm-suggestion {
   font-size: 14px;
   color: var(--success);
@@ -1097,6 +1120,10 @@ video.exercise-video {
 input[type="number"], input[type="text"], textarea, select {
   font-size: 16px !important;
 }
+
+/* Hide scrollbar on weight picker */
+#tmWeightPicker::-webkit-scrollbar { display: none; }
+#tmWeightPicker { -ms-overflow-style: none; scrollbar-width: none; }
 
 /* ── Chart.js containers ── */
 .chart-container {
