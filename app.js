@@ -225,44 +225,49 @@ function daysSinceLastTraining() {
 // ================================================================
 function getMissedTrainings() {
   var now = new Date();
-  var dayOfWeek = now.getDay(); // 0=zo, 1=ma, ..., 6=za
-  var weekType = getWeekType();
-  var schedule = getSchedule(weekType);
+  now.setHours(0,0,0,0);
   var sessions = getStore('sessions', []);
   var missed = [];
+  var seen = {};
 
-  // Loop door alle dagen eerder deze week (ma t/m gisteren)
-  for (var d = 1; d < dayOfWeek; d++) {
-    var scheduledKey = schedule[d];
+  // Look back up to 7 days (not including today)
+  for (var daysAgo = 1; daysAgo <= 7; daysAgo++) {
+    var checkDate = new Date(now);
+    checkDate.setDate(checkDate.getDate() - daysAgo);
+    var checkDow = checkDate.getDay();
+
+    var checkWeekType = getWeekTypeForDate(checkDate);
+    var schedule = getSchedule(checkWeekType);
+    var scheduledKey = schedule[checkDow];
     if (!scheduledKey) continue;
-    // Alleen krachttrainingen (cardio/loopband missen is minder erg)
     if (!TRAINING_DATA[scheduledKey] || TRAINING_DATA[scheduledKey].type !== 'kracht') continue;
+    if (seen[scheduledKey]) continue;
 
-    // Bereken de datum van die dag
-    var dayDate = new Date(now);
-    dayDate.setDate(dayDate.getDate() - (dayOfWeek - d));
-    var dayKey = dayDate.getFullYear() + '-' + String(dayDate.getMonth()+1).padStart(2,'0') + '-' + String(dayDate.getDate()).padStart(2,'0');
+    var windowStart = new Date(checkDate);
+    windowStart.setDate(windowStart.getDate() - 1);
+    var windowEnd = new Date(now);
 
-    // Check of er een sessie is met deze trainingKey op die dag (of later deze week)
     var wasDone = sessions.some(function(s) {
       var sDate = new Date(s.date);
-      var sDay = sDate.getDay();
-      // Check of deze training ergens deze week is gedaan
-      var monday = new Date(now);
-      monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-      monday.setHours(0,0,0,0);
-      return s.trainingKey === scheduledKey && sDate >= monday;
+      sDate.setHours(0,0,0,0);
+      return s.trainingKey === scheduledKey && sDate >= windowStart && sDate <= windowEnd;
     });
 
     if (!wasDone) {
+      seen[scheduledKey] = true;
       missed.push({
         trainingKey: scheduledKey,
-        scheduledDay: d,
+        scheduledDay: checkDow,
+        daysAgo: daysAgo,
         name: TRAINING_DATA[scheduledKey].name || scheduledKey
       });
     }
   }
   return missed;
+}
+
+function getWeekTypeForDate(date) {
+  return getWeekType();
 }
 
 function applyCatchUpSwap(missedKey) {
