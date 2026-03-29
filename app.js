@@ -277,8 +277,14 @@ function applyCatchUpSwap(missedKey) {
 }
 
 function skipCatchUp() {
-  // Gebruiker wil gewoon de normale training doen
   setStore('catchUpToday', { skipped: true, date: getTodayKey() });
+  renderToday();
+}
+
+function catchUpFromPreview(trainingKey) {
+  setStore('catchUpToday', { trainingKey: trainingKey, date: getTodayKey() });
+  closeDayPreview();
+  showPage('today');
   renderToday();
 }
 
@@ -2937,15 +2943,7 @@ function renderToday() {
     trainingKey = catchUp.trainingKey;
     catchUpActive = true;
   }
-  var missed = getMissedTrainings();
-  var showCatchUpChoice = false;
-  if (missed.length > 0 && trainingKey && !catchUpActive && !isPostponed) {
-    // Er is een gemiste training EN er staat vandaag iets gepland
-    // Check of gebruiker al heeft gekozen (skipped)
-    if (!catchUp || catchUp.date !== todayKey || (!catchUp.skipped && !catchUp.trainingKey)) {
-      showCatchUpChoice = true;
-    }
-  }
+  // Catch-up choice is now handled via agenda day-preview ("Nu doen" button)
 
   // Build motivation strip + weekly summary
   var motivHtml = '';
@@ -2960,24 +2958,7 @@ function renderToday() {
     motivHtml += '</div>';
   }
 
-  // Toon inhaal-keuze als er gemiste training is
-  if (showCatchUpChoice) {
-    var missedT = missed[0];
-    var todayT = TRAINING_DATA[trainingKey];
-    var DAY_NAMES = ['zondag','maandag','dinsdag','woensdag','donderdag','vrijdag','zaterdag'];
-    motivHtml += '<div style="margin:12px 16px;padding:16px;background:var(--info-bg);border:1px solid var(--primary);border-radius:16px">';
-    motivHtml += '<div style="font-weight:700;font-size:15px;margin-bottom:6px">\uD83D\uDD04 Gemiste training inhalen?</div>';
-    motivHtml += '<div style="font-size:13px;color:var(--text-light);line-height:1.5;margin-bottom:14px">';
-    motivHtml += 'Je hebt <strong>' + missedT.name + '</strong> van ' + DAY_NAMES[missedT.scheduledDay] + ' gemist. Vandaag staat <strong>' + (todayT ? todayT.name : trainingKey) + '</strong> gepland. Wat wil je doen?';
-    motivHtml += '</div>';
-    motivHtml += '<div style="display:flex;gap:8px">';
-    motivHtml += '<button onclick="applyCatchUpSwap(\'' + missedT.trainingKey + '\')" style="flex:1;padding:12px;border-radius:50px;border:2px solid var(--primary);background:var(--primary);color:white;font-size:14px;font-weight:700;cursor:pointer">';
-    motivHtml += missedT.name + ' inhalen</button>';
-    motivHtml += '<button onclick="skipCatchUp()" style="flex:1;padding:12px;border-radius:50px;border:2px solid var(--border);background:var(--card);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">';
-    motivHtml += (todayT ? todayT.name : 'Gewoon') + ' doen</button>';
-    motivHtml += '</div>';
-    motivHtml += '</div>';
-  }
+  // (Inhaal-keuze is nu via agenda → dag aanklikken → "Nu doen")
 
   // Toon inhaal-banner als swap actief is
   if (catchUpActive) {
@@ -5719,6 +5700,8 @@ function renderAgenda() {
       html += '</div>';
       if (isDone) {
         html += '<div class="agenda-day-done">\u2713</div>';
+      } else if (isPast && isClickable) {
+        html += '<div style="font-size:11px;color:var(--accent);font-weight:600;white-space:nowrap">Inhalen \u203A</div>';
       } else if (isClickable) {
         html += '<div class="agenda-day-arrow">\u203A</div>';
       }
@@ -5745,7 +5728,7 @@ function openDayPreview(trainingKey, dateStr, dayLabel) {
   title.textContent = dayLabel;
 
   if (training.type === 'kracht') {
-    renderKrachtPreview(body, training, trainingKey);
+    renderKrachtPreview(body, training, trainingKey, dateStr);
   } else {
     renderCardioPreview(body, training, trainingKey);
   }
@@ -5762,12 +5745,40 @@ function closeDayPreview() {
   document.body.style.overflow = '';
 }
 
-function renderKrachtPreview(container, training, trainingKey) {
+function renderKrachtPreview(container, training, trainingKey, dateStr) {
+  var isMissed = false;
+  if (dateStr) {
+    var previewDate = new Date(dateStr);
+    var today = new Date();
+    today.setHours(0,0,0,0);
+    previewDate.setHours(0,0,0,0);
+    if (previewDate < today) {
+      var sessions = getStore('sessions', []);
+      var wasDone = sessions.some(function(s) {
+        var sDate = new Date(s.date);
+        sDate.setHours(0,0,0,0);
+        return s.trainingKey === trainingKey && sDate.getTime() === previewDate.getTime();
+      });
+      if (!wasDone) {
+        var daysAgo = Math.floor((today - previewDate) / 86400000);
+        if (daysAgo <= 7) isMissed = true;
+      }
+    }
+  }
+
   var html = '<div class="card">';
   html += '<div class="card-header"><span class="icon">\uD83C\uDFCB</span><div>';
   html += '<div style="font-size:20px;font-weight:700;color:var(--primary)">' + training.name + '</div>';
   html += '<div style="font-size:13px;color:var(--text-light)">3 sets per oefening \u00b7 \u00b145 min</div>';
   html += '</div></div>';
+
+  if (isMissed) {
+    html += '<div style="padding:14px 18px;background:var(--info-bg);border-bottom:1px solid var(--border)">';
+    html += '<div style="font-size:13px;color:var(--text-light);margin-bottom:10px">\u26A0\uFE0F Deze training is niet gedaan. Wil je hem nu alsnog doen?</div>';
+    html += '<button onclick="catchUpFromPreview(\'' + trainingKey + '\')" style="width:100%;padding:14px;border-radius:50px;border:none;background:linear-gradient(135deg,#7B3FA0,#B794D6);color:white;font-size:16px;font-weight:700;cursor:pointer;box-shadow:var(--glow-primary)">';
+    html += '\uD83D\uDCAA Nu doen</button>';
+    html += '</div>';
+  }
 
   // Warmup
   html += '<div class="phase-block"><div class="phase-icon">\uD83D\uDD25</div>';
