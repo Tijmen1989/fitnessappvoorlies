@@ -4406,14 +4406,14 @@ function renderProfile() {
         html += '<p style="font-size:12px;color:var(--text-light);margin-bottom:12px">Gebruik dezelfde trainingsdata op meerdere apparaten (bijv. laptop \u0026 telefoon).</p>';
 
         // Stap 1: Code genereren
-        html += '<div style="background:var(--card-bg, #f8f9fa);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px">';
+        html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px">';
         html += '<div style="font-size:12px;font-weight:600;margin-bottom:6px">Stap 1 \u2014 Op dit apparaat:</div>';
         html += '<button class="save-btn" onclick="createKoppelcode()" style="font-size:13px;width:100%">\uD83D\uDD11 Genereer koppelcode</button>';
         html += '<div id="koppelcodeDisplay"></div>';
         html += '</div>';
 
         // Stap 2: Code invoeren
-        html += '<div style="background:var(--card-bg, #f8f9fa);border:1px solid var(--border);border-radius:10px;padding:12px">';
+        html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px">';
         html += '<div style="font-size:12px;font-weight:600;margin-bottom:6px">Stap 2 \u2014 Op het andere apparaat:</div>';
         html += '<div style="display:flex;gap:8px">';
         html += '<input id="koppelcodeInput" type="text" inputmode="numeric" maxlength="6" placeholder="6-cijferige code" style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:16px;font-family:monospace;letter-spacing:4px;text-align:center;background:var(--bg);color:var(--text)">';
@@ -4492,11 +4492,11 @@ function renderProfile() {
 function createProgressCharts(sessions, measurements, weightGoal) {
   if (typeof Chart === 'undefined') return;
 
-  var isDark = document.body.classList.contains('dark');
-  var textColor = isDark ? '#ccc' : '#555';
-  var gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
-  var tooltipBg = isDark ? '#333' : '#fff';
-  var tooltipColor = isDark ? '#eee' : '#333';
+  var isDark = true; // Design D is always dark
+  var textColor = '#ccc';
+  var gridColor = 'rgba(255,255,255,0.08)';
+  var tooltipBg = '#333';
+  var tooltipColor = '#eee';
 
   // Mobile detection and responsive settings
   var isMobile = window.innerWidth < 600;
@@ -4507,7 +4507,7 @@ function createProgressCharts(sessions, measurements, weightGoal) {
     backgroundColor: tooltipBg,
     titleColor: tooltipColor,
     bodyColor: tooltipColor,
-    borderColor: isDark ? '#555' : '#ddd',
+    borderColor: 'rgba(255,255,255,0.15)',
     borderWidth: 1,
     padding: 10,
     cornerRadius: 8,
@@ -4532,7 +4532,7 @@ function createProgressCharts(sessions, measurements, weightGoal) {
         datasets: [{
           label: 'Gewicht',
           data: wData,
-          borderColor: '#1B4F72',
+          borderColor: '#B794D6',
           backgroundColor: function(ctx) {
             var chart = ctx.chart;
             if (!chart.chartArea) return 'rgba(27,79,114,0.15)';
@@ -4545,8 +4545,8 @@ function createProgressCharts(sessions, measurements, weightGoal) {
           fill: true,
           tension: 0.35,
           pointRadius: 4,
-          pointBackgroundColor: '#1B4F72',
-          pointBorderColor: isDark ? '#222' : '#fff',
+          pointBackgroundColor: '#B794D6',
+          pointBorderColor: '#1A1030',
           pointBorderWidth: 2,
           pointHoverRadius: 7,
           pointHoverBorderWidth: 3
@@ -4578,7 +4578,7 @@ function createProgressCharts(sessions, measurements, weightGoal) {
                   content: 'Doel: ' + weightGoal + ' kg',
                   position: 'start',
                   backgroundColor: 'rgba(39,174,96,0.15)',
-                  color: '#27AE60',
+                  color: '#8DC63F',
                   font: { size: 11, weight: '600' },
                   padding: { top: 3, bottom: 3, left: 6, right: 6 }
                 }
@@ -4630,8 +4630,8 @@ function createProgressCharts(sessions, measurements, weightGoal) {
       data: {
         labels: wLabelsF,
         datasets: [
-          { label: 'Kracht', data: wKrachtData, backgroundColor: '#1B4F72', borderRadius: 4, barPercentage: 0.7 },
-          { label: 'Cardio', data: wCardioData, backgroundColor: '#E67E22', borderRadius: 4, barPercentage: 0.7 }
+          { label: 'Kracht', data: wKrachtData, backgroundColor: '#7B3FA0', borderRadius: 4, barPercentage: 0.7 },
+          { label: 'Cardio', data: wCardioData, backgroundColor: '#F47B20', borderRadius: 4, barPercentage: 0.7 }
         ]
       },
       options: {
@@ -4655,7 +4655,7 @@ function createProgressCharts(sessions, measurements, weightGoal) {
   var strengthCanvas = document.getElementById('strengthChart');
   if (strengthCanvas) {
     var exHistory = buildExerciseHistory(sessions);
-    var colors = ['#1B4F72', '#E67E22', '#27AE60', '#8E44AD', '#2980B9', '#C0392B', '#F39C12', '#16A085'];
+    var colors = ['#B794D6', '#F47B20', '#8DC63F', '#F74B7A', '#FCC200', '#CDB4E6', '#7B3FA0', '#A8D96A'];
     var datasets = [];
     var ci = 0;
 
@@ -4693,7 +4693,7 @@ function createProgressCharts(sessions, measurements, weightGoal) {
         spanGaps: true,
         pointRadius: 3,
         pointBackgroundColor: color,
-        pointBorderColor: isDark ? '#222' : '#fff',
+        pointBorderColor: '#1A1030',
         pointBorderWidth: 1.5,
         pointHoverRadius: 6
       });
@@ -4765,21 +4765,21 @@ function createProgressCharts(sessions, measurements, weightGoal) {
             {
               label: 'Energie',
               data: energyData,
-              borderColor: '#27AE60',
+              borderColor: '#8DC63F',
               backgroundColor: 'transparent',
               borderWidth: 2.5,
               fill: false,
               tension: 0.3,
               pointRadius: isMobile ? 3 : 4,
-              pointBackgroundColor: '#27AE60',
-              pointBorderColor: isDark ? '#222' : '#fff',
+              pointBackgroundColor: '#8DC63F',
+              pointBorderColor: '#1A1030',
               pointBorderWidth: 1.5
             },
             {
               label: 'Kuitpijn',
               data: painScaled,
-              borderColor: '#E67E22',
-              backgroundColor: 'rgba(230,126,34,0.08)',
+              borderColor: '#F47B20',
+              backgroundColor: 'rgba(244,123,32,0.08)',
               borderWidth: 2,
               borderDash: [4, 3],
               fill: true,
@@ -4793,7 +4793,7 @@ function createProgressCharts(sessions, measurements, weightGoal) {
                 if (val === 3) return cs.getPropertyValue('--accent').trim();
                 return cs.getPropertyValue('--danger').trim();
               },
-              pointBorderColor: isDark ? '#222' : '#fff',
+              pointBorderColor: '#1A1030',
               pointBorderWidth: 1.5,
               pointStyle: 'triangle'
             }
@@ -4846,7 +4846,7 @@ function createProgressCharts(sessions, measurements, weightGoal) {
             label: 'Volume (kg)',
             data: volData,
             backgroundColor: 'rgba(39,174,96,0.5)',
-            borderColor: '#27AE60',
+            borderColor: '#8DC63F',
             borderWidth: 1,
             borderRadius: 4
           }]
@@ -4889,8 +4889,8 @@ function createProgressCharts(sessions, measurements, weightGoal) {
         data: {
           labels: whLabels,
           datasets: [
-            { label: 'Taille (cm)', data: waistD, borderColor: '#E67E22', backgroundColor: 'rgba(230,126,34,0.08)', borderWidth: 2, fill: true, tension: 0.3, pointRadius: 5, pointBackgroundColor: '#E67E22', pointBorderColor: isDark ? '#222' : '#fff', pointBorderWidth: 2 },
-            { label: 'Heup (cm)', data: hipD, borderColor: '#8E44AD', backgroundColor: 'rgba(142,68,173,0.08)', borderWidth: 2, fill: true, tension: 0.3, pointRadius: 5, pointBackgroundColor: '#8E44AD', pointBorderColor: isDark ? '#222' : '#fff', pointBorderWidth: 2 }
+            { label: 'Taille (cm)', data: waistD, borderColor: '#F47B20', backgroundColor: 'rgba(244,123,32,0.08)', borderWidth: 2, fill: true, tension: 0.3, pointRadius: 5, pointBackgroundColor: '#F47B20', pointBorderColor: '#1A1030', pointBorderWidth: 2 },
+            { label: 'Heup (cm)', data: hipD, borderColor: '#8E44AD', backgroundColor: 'rgba(142,68,173,0.08)', borderWidth: 2, fill: true, tension: 0.3, pointRadius: 5, pointBackgroundColor: '#8E44AD', pointBorderColor: '#1A1030', pointBorderWidth: 2 }
           ]
         },
         options: {
@@ -5170,7 +5170,7 @@ function applyDarkMode() {
   document.body.setAttribute('data-theme', dark ? 'dark' : 'light');
   // Update theme-color meta tag
   var meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = dark ? '#16213E' : '#1B4F72';
+  if (meta) meta.content = dark ? '#0F0A1E' : '#1A1030';
 }
 
 function toggleDarkMode() {

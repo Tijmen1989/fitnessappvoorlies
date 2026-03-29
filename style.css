@@ -1,89 +1,81 @@
+/* ══════════════════════════════════════════════════
+   DESIGN D: GLASS + BOLD MIX — Dark gradient base
+   with glassmorphism cards & colored accents
+   ══════════════════════════════════════════════════ */
 :root {
-  --primary: #7B3FA0;
-  --primary-light: #9B6BBF;
-  --primary-dark: #5E2D7A;
+  --primary: #B794D6;
+  --primary-light: #CDB4E6;
+  --primary-dark: #7B3FA0;
   --accent: #FCC200;
   --success: #8DC63F;
   --danger: #F74B7A;
-  --bg: #F5F7FA;
-  --card: #FFFFFF;
-  --text: #333333;
-  --text-light: #888888;
-  --border: #E8ECF0;
-  --shadow: 0 2px 8px rgba(0,0,0,0.08);
-  --warning: #FCC200;
-  --success-bg: #F0FAF0;
-  --success-text: #1E8449;
-  --warning-bg: #FEF9E7;
-  --warning-text: #7D6608;
-  --info-bg: #EBF5FB;
-  --hint-bg: #E8F8F5;
-  --subtle-bg: #F8FAFB;
-  --danger-bg: #FDEDEC;
-  --neutral-bg: #BDC3C7;
+  --orange: #F47B20;
+  --bg: #1A1030;
+  --bg-gradient: linear-gradient(180deg, #7B3FA0 0%, #3A1F5A 25%, #1A1030 60%);
+  --card: rgba(255,255,255,0.08);
+  --card-solid: #241845;
+  --card-border: rgba(255,255,255,0.12);
+  --glass-blur: blur(16px);
+  --text: #F0EDF5;
+  --text-light: rgba(255,255,255,0.5);
+  --border: rgba(255,255,255,0.1);
+  --shadow: 0 4px 24px rgba(0,0,0,0.3);
+  --warning: #F47B20;
+  --success-bg: rgba(141,198,63,0.12);
+  --success-text: #A8D96A;
+  --warning-bg: rgba(244,123,32,0.12);
+  --warning-text: #FCC200;
+  --info-bg: rgba(183,148,214,0.15);
+  --hint-bg: rgba(141,198,63,0.1);
+  --subtle-bg: rgba(255,255,255,0.05);
+  --danger-bg: rgba(247,75,122,0.12);
+  --neutral-bg: rgba(255,255,255,0.15);
   --radius-lg: 20px;
   --radius-md: 14px;
   --radius-sm: 10px;
+  --gradient-primary: #B794D6;
+  --gradient-success: #8DC63F;
+  --gradient-accent: #FCC200;
+  --gradient-fire: #F74B7A;
+  --glow-primary: 0 4px 24px rgba(123,63,160,0.4);
+  --glow-success: 0 4px 24px rgba(141,198,63,0.3);
+  --glow-accent: 0 4px 24px rgba(252,194,0,0.3);
+  --glow-danger: 0 4px 24px rgba(247,75,122,0.3);
 }
 
-/* Dark mode overrides */
+/* Dark mode = same as default (already dark), just tweak slightly */
 [data-theme="dark"] {
-  --primary: #9B6BBF;
-  --primary-light: #B794D6;
-  --primary-dark: #7B3FA0;
-  --accent: #FCC200;
-  --bg: #1A1A2E;
-  --card: #222240;
-  --text: #E8E8E8;
-  --text-light: #999AAD;
-  --border: #33334A;
-  --shadow: 0 2px 8px rgba(0,0,0,0.3);
-  --warning: #FCC200;
-  --success-bg: rgba(141,198,63,0.1);
-  --success-text: #5DDE8E;
-  --warning-bg: #2A2A20;
-  --warning-text: #E0C060;
-  --info-bg: rgba(155,107,191,0.12);
-  --hint-bg: rgba(141,198,63,0.08);
-  --subtle-bg: var(--card);
-  --danger-bg: rgba(247,75,122,0.1);
-  --neutral-bg: #555568;
+  --bg: #0F0A1E;
+  --bg-gradient: linear-gradient(180deg, #5E2D7A 0%, #2A1545 25%, #0F0A1E 60%);
+  --card: rgba(255,255,255,0.06);
+  --card-solid: #1A1235;
+  --card-border: rgba(255,255,255,0.08);
+  --text: #E8E4F0;
+  --text-light: rgba(255,255,255,0.4);
+  --border: rgba(255,255,255,0.07);
 }
-[data-theme="dark"] .topbar { background: var(--card); border-bottom-color: var(--border); }
-[data-theme="dark"] .bottom-nav { background: var(--card); border-top-color: var(--border); }
-[data-theme="dark"] .nav-item { color: #999AAD; }
-[data-theme="dark"] .nav-item.active { color: #F5B041; }
-[data-theme="dark"] .tm-header { background: #16213E; }
-[data-theme="dark"] .training-mode { background: var(--bg); }
-[data-theme="dark"] .motivation-strip { background: #1A1A2E; }
-[data-theme="dark"] input, [data-theme="dark"] textarea { background: #2A2A45; color: #E8E8E8; border-color: #33334A; }
-[data-theme="dark"] .modal-sheet { background: var(--card); color: var(--text); }
-[data-theme="dark"] .modal-option { border-color: var(--border); }
-[data-theme="dark"] .modal-option:active { background: rgba(46,117,182,0.15); border-color: var(--primary-light); }
-[data-theme="dark"] .modal-option.recommended { background: rgba(39,174,96,0.1); }
-[data-theme="dark"] .vrije-training-btn { background: var(--card); border-color: var(--primary-light); color: var(--primary-light); }
-[data-theme="dark"] .exercise-item.done .ex-name { color: var(--text-light); }
-[data-theme="dark"] .completion-stats { background: var(--card); }
-[data-theme="dark"] .tm-btn-outline { background: var(--card); color: var(--primary-light); border-color: var(--border); }
-[data-theme="dark"] .bottom-nav { background: #16213E; }
 
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  -webkit-font-smoothing: antialiased;
   background: var(--bg);
+  background-image: var(--bg-gradient);
+  background-attachment: fixed;
   color: var(--text);
   min-height: 100vh;
   padding-bottom: 80px;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* ================================================================
    TOP BAR
    ================================================================ */
 .topbar {
-  background: var(--card);
+  background: rgba(26,16,48,0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   color: var(--text);
   padding: 18px 20px 14px;
   padding-top: max(18px, env(safe-area-inset-top));
@@ -92,11 +84,11 @@ body {
   z-index: 100;
   border-bottom: 1px solid var(--border);
 }
-.topbar h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; color: var(--text); }
+.topbar h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; color: white; }
 .topbar .subtitle { font-size: 13px; color: var(--text-light); margin-top: 3px; font-weight: 500; }
 .topbar .week-badge {
   display: inline-block;
-  background: var(--info-bg);
+  background: rgba(183,148,214,0.2);
   color: var(--primary);
   padding: 3px 10px;
   border-radius: 50px;
@@ -111,10 +103,12 @@ body {
    ================================================================ */
 .card {
   background: var(--card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--radius-lg);
   margin: 14px 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
-  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--card-border);
   overflow: hidden;
   transition: transform 0.15s ease;
 }
@@ -127,8 +121,9 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  color: white;
 }
-.card-header .icon { font-size: 20px; }
+.card-header .icon { font-size: 22px; }
 
 /* ================================================================
    REST/CYCLING DAY
@@ -147,8 +142,8 @@ body {
   width: calc(100% - 32px);
   margin: 8px auto;
   padding: 12px;
-  background: var(--card);
-  border: 2px dashed var(--primary-light);
+  background: rgba(255,255,255,0.06);
+  border: 2px dashed rgba(183,148,214,0.3);
   border-radius: 14px;
   font-size: 15px;
   color: var(--primary);
@@ -156,7 +151,7 @@ body {
   cursor: pointer;
   text-align: center;
 }
-.vrije-training-btn:active { background: var(--border); transform: scale(0.98); }
+.vrije-training-btn:active { background: rgba(255,255,255,0.1); transform: scale(0.98); }
 
 /* ================================================================
    EXERCISE ITEMS (overview mode)
@@ -166,7 +161,7 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .exercise-item:last-child { border-bottom: none; }
-.exercise-item.done { background: var(--success-bg); }
+.exercise-item.done { background: rgba(141,198,63,0.08); }
 .exercise-item.done .ex-name { text-decoration: line-through; color: var(--text-light); }
 
 .ex-top { display: flex; align-items: center; gap: 12px; }
@@ -206,7 +201,8 @@ body {
    EXERCISE INSTRUCTION PANEL
    ================================================================ */
 .instruction-panel {
-  background: var(--subtle-bg);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--card-border);
   border-radius: 10px;
   padding: 14px;
   margin-bottom: 10px;
@@ -260,18 +256,18 @@ iframe.exercise-video {
   aspect-ratio: 16 / 9;
   border-radius: 12px;
 }
-.exercise-video.loaded, .exercise-image.loaded {
-  display: block;
-}
-.exercise-video-container {
-  text-align: center;
-}
 video.exercise-video {
   width: 100%;
   max-width: 400px;
   border-radius: 12px;
   display: block;
   margin: 0 auto;
+}
+.exercise-video.loaded, .exercise-image.loaded {
+  display: block;
+}
+.exercise-video-container {
+  text-align: center;
 }
 
 .instr-focus {
@@ -297,11 +293,13 @@ video.exercise-video {
 .weight-row label { font-size: 13px; color: var(--text-light); white-space: nowrap; }
 .weight-input, .reps-input {
   padding: 8px 10px;
-  border: 1.5px solid var(--border);
+  border: 1.5px solid var(--card-border);
   border-radius: 8px;
   font-size: 15px;
   text-align: center;
   -webkit-appearance: none;
+  background: rgba(255,255,255,0.08);
+  color: white;
 }
 .weight-input { width: 70px; }
 .reps-input { width: 50px; }
@@ -326,14 +324,14 @@ video.exercise-video {
    ================================================================ */
 .section-header {
   padding: 14px 18px;
-  background: var(--primary);
+  background: rgba(123,63,160,0.3);
   color: white;
   font-weight: 600;
   font-size: 14px;
 }
 .phase-block {
   padding: 12px 18px;
-  background: var(--subtle-bg);
+  background: rgba(255,255,255,0.04);
   border-bottom: 1px solid var(--border);
   display: flex; align-items: center; gap: 12px;
 }
@@ -375,6 +373,7 @@ video.exercise-video {
   position: fixed;
   inset: 0;
   background: var(--bg);
+  background-image: var(--bg-gradient);
   z-index: 500;
   display: none;
   flex-direction: column;
@@ -390,7 +389,9 @@ video.exercise-video {
 }
 
 .tm-header {
-  background: var(--primary);
+  background: rgba(26,16,48,0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   color: white;
   padding: 16px 20px;
   padding-top: max(16px, env(safe-area-inset-top));
@@ -398,31 +399,35 @@ video.exercise-video {
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
 }
 .tm-header h2 { font-size: 16px; font-weight: 600; flex: 1; }
 .tm-header { gap: 8px; }
 .tm-pause {
-  background: rgba(255,255,255,0.25);
-  border: none;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.15);
   color: white;
   padding: 8px 14px;
-  border-radius: 8px;
+  border-radius: 50px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
 .tm-close {
-  background: rgba(255,255,255,0.2);
-  border: none;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.15);
   color: white;
   padding: 8px 14px;
-  border-radius: 8px;
+  border-radius: 50px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
 .resume-banner {
-  background: var(--primary);
+  background: linear-gradient(135deg, rgba(123,63,160,0.4), rgba(247,75,122,0.3));
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid rgba(247,75,122,0.3);
   color: white;
   border-radius: 14px;
   padding: 16px;
@@ -431,23 +436,24 @@ video.exercise-video {
   display: flex;
   align-items: center;
   gap: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: var(--glow-danger);
   animation: pulse-border 2s infinite;
 }
 .resume-banner:active { transform: scale(0.98); }
 @keyframes pulse-border {
-  0%, 100% { box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-  50% { box-shadow: 0 4px 20px rgba(33,150,243,0.4); }
+  0%, 100% { box-shadow: 0 4px 16px rgba(123,63,160,0.08); }
+  50% { box-shadow: 0 4px 20px rgba(123,63,160,0.2); }
 }
 .tm-progress {
-  background: rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.06);
   height: 4px;
   flex-shrink: 0;
 }
 .tm-progress-bar {
   height: 100%;
-  background: var(--accent);
+  background: linear-gradient(90deg, var(--accent), var(--danger));
   transition: width 0.3s;
+  box-shadow: 0 0 8px rgba(252,194,0,0.4);
 }
 
 .tm-body {
@@ -464,7 +470,7 @@ video.exercise-video {
 .tm-exercise-name {
   font-size: 32px;
   font-weight: 900;
-  color: var(--primary);
+  color: white;
   margin-bottom: 4px;
 }
 .tm-exercise-detail {
@@ -490,8 +496,8 @@ video.exercise-video {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--info-bg);
-  border: 1px solid var(--primary);
+  background: rgba(183,148,214,0.12);
+  border: 1px solid rgba(183,148,214,0.3);
   border-radius: 50px;
   padding: 8px 18px;
   margin-bottom: 16px;
@@ -528,25 +534,28 @@ video.exercise-video {
 .tm-input {
   width: 80px;
   padding: 14px;
-  border: 2px solid var(--border);
+  border: 2px solid var(--card-border);
   border-radius: 12px;
   font-size: 22px;
   text-align: center;
   font-weight: 700;
   -webkit-appearance: none;
+  background: rgba(255,255,255,0.08);
+  color: white;
 }
-.tm-input:focus { outline: none; border-color: var(--primary-light); }
+.tm-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 16px rgba(183,148,214,0.3); }
 
 /* Timer display in training mode */
 .tm-timer {
   font-size: 80px;
   font-weight: 900;
   font-variant-numeric: tabular-nums;
-  color: var(--primary);
+  color: white;
   margin-bottom: 12px;
   line-height: 1;
+  text-shadow: 0 0 40px rgba(183,148,214,0.4);
 }
-.tm-timer.resting { color: var(--accent); }
+.tm-timer.resting { color: var(--accent); text-shadow: 0 0 40px rgba(252,194,0,0.4); }
 .tm-timer-label {
   font-size: 16px;
   color: var(--text-light);
@@ -568,13 +577,15 @@ video.exercise-video {
   letter-spacing: -0.2px;
 }
 .tm-btn:active { transform: scale(0.96); opacity: 0.9; }
-.tm-btn-primary { background: var(--primary); color: white; }
-.tm-btn-success { background: var(--success); color: white; }
-.tm-btn-accent { background: var(--accent); color: #1E293B; }
+.tm-btn-primary { background: linear-gradient(135deg, #7B3FA0, #B794D6); color: white; box-shadow: var(--glow-primary); }
+.tm-btn-success { background: linear-gradient(135deg, #8DC63F, #B8E06A); color: #1A3A0A; box-shadow: var(--glow-success); }
+.tm-btn-accent { background: linear-gradient(135deg, #FCC200, #FFD94E); color: #1E293B; box-shadow: var(--glow-accent); }
 .tm-btn-outline {
-  background: var(--card);
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   color: var(--primary);
-  border: 2px solid var(--border);
+  border: 2px solid var(--card-border);
 }
 .tm-btn-small {
   padding: 12px 20px;
@@ -593,7 +604,10 @@ video.exercise-video {
   margin-bottom: 16px;
 }
 .tm-instruction-box {
-  background: var(--card);
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--card-border);
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 20px;
@@ -650,11 +664,14 @@ video.exercise-video {
 .completion-screen .emoji { font-size: 64px; margin-bottom: 20px; }
 .completion-screen h2 {
   font-size: 24px;
-  color: var(--primary);
+  color: white;
   margin-bottom: 12px;
 }
 .completion-stats {
-  background: var(--card);
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--card-border);
   border-radius: 12px;
   padding: 16px;
   margin: 16px auto;
@@ -678,7 +695,9 @@ video.exercise-video {
 .bottom-nav {
   position: fixed;
   bottom: 0; left: 0; right: 0;
-  background: var(--card);
+  background: rgba(26,16,48,0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--border);
   display: flex;
   padding: 6px 8px;
@@ -690,7 +709,7 @@ video.exercise-video {
   display: flex; flex-direction: column; align-items: center;
   padding: 8px 0;
   cursor: pointer;
-  color: var(--text-light);
+  color: rgba(255,255,255,0.35);
   font-size: 10px;
   font-weight: 600;
   gap: 4px;
@@ -699,7 +718,7 @@ video.exercise-video {
   border-radius: 12px;
   transition: all 0.2s ease;
 }
-.nav-item.active { color: var(--primary); background: var(--info-bg); }
+.nav-item.active { color: var(--accent); background: rgba(252,194,0,0.1); }
 .nav-item .nav-icon { font-size: 22px; }
 
 /* ================================================================
@@ -717,24 +736,29 @@ video.exercise-video {
 }
 .modal-overlay.show { display: flex; }
 .modal-sheet {
-  background: var(--card);
+  background: var(--card-solid);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border-radius: 20px 20px 0 0;
   padding: 20px;
   padding-bottom: max(20px, env(safe-area-inset-bottom));
   width: 100%;
   max-height: 70vh;
   overflow-y: auto;
+  border-top: 1px solid var(--card-border);
+  color: var(--text);
 }
-.modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 16px; }
-.modal-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+.modal-handle { width: 40px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; margin: 0 auto 16px; }
+.modal-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; color: white; }
 .modal-option {
   padding: 16px;
-  border: 1.5px solid var(--border);
+  border: 1.5px solid var(--card-border);
   border-radius: 12px;
   margin-bottom: 10px;
   cursor: pointer;
+  background: rgba(255,255,255,0.05);
 }
-.modal-option:active { background: var(--info-bg); border-color: var(--primary-light); }
+.modal-option:active { background: rgba(183,148,214,0.15); border-color: var(--primary); }
 .modal-option .opt-title { font-weight: 600; font-size: 15px; }
 .modal-option .opt-desc { font-size: 13px; color: var(--text-light); margin-top: 4px; }
 .modal-option.recommended { border-color: var(--success); border-width: 2px; background: rgba(39,174,96,0.04); }
@@ -762,16 +786,18 @@ video.exercise-video {
 .checkin-field input {
   width: 100%;
   padding: 12px 14px;
-  border: 1.5px solid var(--border);
+  border: 1.5px solid var(--card-border);
   border-radius: 10px;
   font-size: 16px;
   -webkit-appearance: none;
+  background: rgba(255,255,255,0.08);
+  color: white;
 }
-.checkin-field input:focus { outline: none; border-color: var(--primary-light); }
+.checkin-field input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 16px rgba(183,148,214,0.2); }
 .save-btn {
   width: 100%;
   padding: 16px;
-  background: var(--primary);
+  background: linear-gradient(135deg, #7B3FA0, #B794D6);
   color: white;
   border: none;
   border-radius: 50px;
@@ -779,6 +805,7 @@ video.exercise-video {
   font-weight: 700;
   cursor: pointer;
   transition: transform 0.15s ease;
+  box-shadow: var(--glow-primary);
 }
 .save-btn:active { transform: scale(0.97); opacity: 0.9; }
 
@@ -786,7 +813,8 @@ video.exercise-video {
    WELCOME / HINTS
    ================================================================ */
 .welcome-banner {
-  background: var(--success);
+  background: linear-gradient(135deg, rgba(141,198,63,0.3), rgba(252,194,0,0.2));
+  border-bottom: 1px solid rgba(141,198,63,0.3);
   color: white;
   padding: 14px 20px;
   font-size: 14px;
@@ -834,7 +862,7 @@ video.exercise-video {
   width: calc(100% - 32px);
   margin: 20px auto;
   padding: 18px;
-  background: var(--success);
+  background: linear-gradient(135deg, #F74B7A, #FCC200);
   color: white;
   border: none;
   border-radius: 50px;
@@ -842,7 +870,7 @@ video.exercise-video {
   font-weight: 700;
   cursor: pointer;
   text-align: center;
-  box-shadow: 0 4px 16px rgba(141,198,63,0.25);
+  box-shadow: 0 4px 24px rgba(247,75,122,0.35);
   transition: transform 0.15s ease;
   letter-spacing: -0.2px;
 }
@@ -876,6 +904,9 @@ video.exercise-video {
 }
 .agenda-days {
   background: var(--card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--card-border);
   border-radius: 14px;
   box-shadow: var(--shadow);
   overflow: hidden;
@@ -888,7 +919,7 @@ video.exercise-video {
   gap: 12px;
 }
 .agenda-day:last-child { border-bottom: none; }
-.agenda-day.today { background: var(--info-bg); }
+.agenda-day.today { background: rgba(183,148,214,0.12); }
 .agenda-day.past { opacity: 0.5; }
 
 .agenda-day-name {
@@ -909,7 +940,7 @@ video.exercise-video {
   line-height: 1.2;
 }
 .agenda-day.today .day-num {
-  color: var(--primary);
+  color: var(--accent);
 }
 
 .agenda-day-dot {
@@ -959,6 +990,7 @@ video.exercise-video {
   position: fixed;
   inset: 0;
   background: var(--bg);
+  background-image: var(--bg-gradient);
   z-index: 300;
   display: none;
   flex-direction: column;
@@ -968,7 +1000,9 @@ video.exercise-video {
 .day-preview-overlay.active { display: flex; }
 
 .dp-header {
-  background: var(--primary);
+  background: rgba(26,16,48,0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   color: white;
   padding: 16px 20px;
   padding-top: max(16px, env(safe-area-inset-top));
@@ -976,14 +1010,15 @@ video.exercise-video {
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
 }
 .dp-header h2 { font-size: 16px; font-weight: 600; }
 .dp-back {
-  background: rgba(255,255,255,0.2);
-  border: none;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.15);
   color: white;
   padding: 8px 14px;
-  border-radius: 8px;
+  border-radius: 50px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -1024,15 +1059,16 @@ video.exercise-video {
   padding: 12px 16px 16px;
 }
 .stat-box {
-  background: var(--bg);
-  border-radius: 10px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
   padding: 12px;
   text-align: center;
 }
 .stat-num {
   font-size: 24px;
   font-weight: 700;
-  color: var(--primary);
+  color: white;
 }
 .stat-label {
   font-size: 12px;
@@ -1060,7 +1096,7 @@ video.exercise-video {
 .toggle-switch input { opacity: 0; width: 0; height: 0; }
 .toggle-slider {
   position: absolute; cursor: pointer; inset: 0;
-  background: var(--border); border-radius: 26px; transition: 0.3s;
+  background: rgba(255,255,255,0.15); border-radius: 26px; transition: 0.3s;
 }
 .toggle-slider::before {
   content: ''; position: absolute; height: 20px; width: 20px;
@@ -1084,12 +1120,13 @@ video.exercise-video {
 /* Primary cardio start button */
 .start-btn-primary {
   display: block; width: calc(100% - 32px); margin: 0 16px 12px;
-  padding: 14px 20px; border: none; border-radius: 12px;
-  background: var(--primary); color: white;
+  padding: 14px 20px; border: none; border-radius: 50px;
+  background: linear-gradient(135deg, #F74B7A, #FCC200); color: white;
   font-size: 16px; font-weight: 600; cursor: pointer;
-  text-align: center; transition: background 0.2s;
+  text-align: center; transition: transform 0.15s;
+  box-shadow: 0 4px 24px rgba(247,75,122,0.35);
 }
-.start-btn-primary:active { background: var(--primary-dark); }
+.start-btn-primary:active { transform: scale(0.96); }
 
 /* Subtle secondary cardio options */
 .other-cardio-item {
@@ -1103,15 +1140,19 @@ video.exercise-video {
 
 /* Backup reminder */
 .backup-reminder {
-  background: var(--card); border-left: 4px solid var(--accent);
+  background: rgba(255,255,255,0.06); border-left: 4px solid var(--accent);
   padding: 12px 16px; margin: 0 16px 12px; border-radius: 8px;
   font-size: 13px; box-shadow: var(--shadow);
+  border: 1px solid var(--card-border); border-left: 4px solid var(--accent);
 }
 
 /* Motivation strip */
 .motivation-strip {
-  background: var(--primary);
-  color: white; padding: 10px 16px; border-radius: 12px;
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--card-border);
+  color: var(--accent); padding: 10px 16px; border-radius: 12px;
   margin: 12px 16px; font-size: 13px; font-weight: 600;
   text-align: center; letter-spacing: 0.3px;
 }

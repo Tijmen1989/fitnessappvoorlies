@@ -95,6 +95,30 @@ const EXERCISE_DB = {
       mistake: 'Je romp meedraaien om de dumbbell omhoog te krijgen. Als dat gebeurt, is het gewicht te zwaar.'
     }
   },
+  'reverse-fly': {
+    id: 'reverse-fly',
+    name: 'Reverse dumbbell fly',
+    apparaat: 'Dumbbells + bankje',
+    reps: '12\u201315',
+    defaultReps: 12,
+    defaultWeight: 3,
+    rest: 45,
+    tip: 'Licht gewicht, focus op knijpen tussen schouderbladen',
+    videoUrl: '',
+    youtubeId: 'ttvfGg9d76c',
+    instruction: {
+      goal: 'Achterste schouders en bovenrug trainen. Voorkomt bovenrug- en nekpijn.',
+      steps: [
+        'Ga op de rand van het bankje zitten, buig voorover met je borst richting je knie\u00ebn.',
+        'Laat de dumbbells onder je benen hangen, handpalmen naar elkaar.',
+        'Spreid je armen naar buiten en omhoog, alsof je vleugels uitslaat.',
+        'Knijp bovenaan je schouderbladen naar elkaar, houd 1 seconde vast.',
+        'Laat langzaam en gecontroleerd terugzakken.'
+      ],
+      focus: 'Denk aan "schouderbladen naar elkaar toe knijpen". Houd je armen licht gebogen. Het gewicht hoeft niet zwaar \u2014 het gaat om controle en squeeze.',
+      mistake: 'Te zwaar gewicht pakken en met momentum slingeren. Dit is een isolatie-oefening: langzaam en gecontroleerd.'
+    }
+  },
   'leg-ext': {
     id: 'leg-ext',
     name: 'Leg extension',
@@ -265,14 +289,14 @@ var PHASE_CONFIG = {
     name: 'Fase 1 \u2014 Basis',
     description: 'Leer de basisoefeningen goed uitvoeren',
     unlockRequirement: null,
-    krachtBoven: ['chest-press', 'shoulder-press', 'dumbbell-row', 'plank', 'dead-bug'],
+    krachtBoven: ['chest-press', 'shoulder-press', 'dumbbell-row', 'reverse-fly', 'plank', 'dead-bug'],
     krachtOnder: ['leg-curl', 'leg-ext', 'goblet-squat', 'glute-bridge', 'plank', 'bird-dog']
   },
   2: {
     name: 'Fase 2 \u2014 Uitbreiding',
     description: 'Meer oefeningen en hogere intensiteit',
     unlockRequirement: { sessions: 12, weeks: 4 },
-    krachtBoven: ['chest-press', 'incline-press', 'shoulder-press', 'dumbbell-row', 'plank', 'dead-bug'],
+    krachtBoven: ['chest-press', 'incline-press', 'shoulder-press', 'dumbbell-row', 'reverse-fly', 'plank', 'dead-bug'],
     krachtOnder: ['leg-curl', 'leg-ext', 'goblet-squat', 'glute-bridge', 'plank', 'bird-dog']
   }
 };
