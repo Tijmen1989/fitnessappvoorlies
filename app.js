@@ -284,7 +284,12 @@ function skipCatchUp() {
 function catchUpFromPreview(trainingKey) {
   setStore('catchUpToday', { trainingKey: trainingKey, date: getTodayKey() });
   closeDayPreview();
-  showPage('today');
+  // Switch to today page
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.getElementById('pageTrain').classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelector('.nav-item').classList.add('active');
+  window.scrollTo(0, 0);
   renderToday();
 }
 
