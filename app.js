@@ -5636,7 +5636,7 @@ function renderAgenda() {
     var weekType = weekNum % 2 === 0 ? 'A' : 'B';
     var isCurrentWeek = w === 0;
 
-    html += '<div class="agenda-week">';
+    html += '<div class="agenda-week"' + (isCurrentWeek ? ' id="agendaCurrentWeek"' : '') + '>';
     html += '<div class="agenda-week-header">';
     html += '<span>Week ' + weekNum + (w === -1 ? ' (vorige week)' : '') + '</span>';
     html += '<span class="agenda-week-badge ' + (isCurrentWeek ? 'current' : '') + '">Week ' + weekType + (isCurrentWeek ? ' (deze week)' : w === -1 ? ' (vorige)' : '') + '</span>';
@@ -5712,6 +5712,12 @@ function renderAgenda() {
   }
 
   container.innerHTML = html;
+
+  // Auto-scroll to current week
+  setTimeout(function() {
+    var cw = document.getElementById('agendaCurrentWeek');
+    if (cw) cw.scrollIntoView({ behavior: 'auto', block: 'start' });
+  }, 50);
 }
 
 // ================================================================
