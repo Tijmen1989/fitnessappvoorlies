@@ -4,8 +4,8 @@
   "description": "Persoonlijk trainingsschema",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#F5F7FA",
-  "theme_color": "#1B4F72",
+  "background_color": "#1A1030",
+  "theme_color": "#7B3FA0",
   "orientation": "portrait",
   "icons": [
     {

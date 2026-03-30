@@ -390,6 +390,37 @@ const TRAINING_DATA = {
       }
     ]
   },
+  inclineWandelen: {
+    id: 'incline-wandelen',
+    name: 'Incline wandelen',
+    type: 'cardio',
+    options: (function() {
+      var opts = [];
+      for (var t = 20; t <= 45; t += 5) {
+        var warmup = 3;
+        var cooldown = Math.min(4, Math.round(t * 0.13));
+        if (cooldown < 3) cooldown = 3;
+        var herstel = Math.max(2, Math.round((t - warmup - cooldown) * 0.12));
+        var main = t - warmup - cooldown - herstel;
+        var opbouw = Math.round(main / 2);
+        var piek = main - opbouw;
+        opts.push({
+          name: t + ' minuten',
+          totalMin: t,
+          isPrimary: t === 30,
+          phases: [
+            { name: 'Warming-up', duur: warmup, detail: '5.5 km/u, incline 0%', intensity: 'low' },
+            { name: 'Opbouw', duur: opbouw, detail: '6.0 km/u, incline 4%', intensity: 'medium' },
+            { name: 'Piek', duur: piek, detail: '6.0\u20136.5 km/u, incline 6%', intensity: 'high' },
+            { name: 'Herstel', duur: herstel, detail: '6.0 km/u, incline 3%', intensity: 'medium' },
+            { name: 'Cooldown', duur: cooldown, detail: '5.5 km/u, incline 0%', intensity: 'low' }
+          ],
+          interval: null
+        });
+      }
+      return opts;
+    })()
+  },
   cardioLicht: {
     id: 'cardio-licht',
     name: 'Lichte cardio',
@@ -530,8 +561,10 @@ var STRETCH_ROUTINES = [
 
 function getSchedule(weekType) {
   var base = {
+    1: 'inclineWandelen',     // Maandag: incline wandelen (vervangt fietsen naar school)
     2: 'loopbandWandelen',    // Dinsdag
     3: 'krachtOnder',         // Woensdag (benen/onderlichaam)
+    4: 'inclineWandelen',     // Donderdag: incline wandelen (vervangt fietsen naar school)
     6: 'krachtBoven'          // Zaterdag (armen/bovenlichaam)
   };
   if (weekType === 'B') {

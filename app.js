@@ -3203,7 +3203,7 @@ function renderCardioOverview(container, training, trainingKey, motivHtml) {
     return;
   }
 
-  html += '<div style="font-size:13px;color:var(--text-light)">Kies je apparaat</div>';
+  html += '<div style="font-size:13px;color:var(--text-light)">' + (trainingKey === 'inclineWandelen' ? 'Kies je duur' : 'Kies je apparaat') + '</div>';
   html += '</div></div>';
 
   // Find primary option (or first)
@@ -5856,7 +5856,7 @@ function renderCardioPreview(container, training, trainingKey) {
   var html = '<div class="card">';
   html += '<div class="card-header"><span class="icon">\uD83D\uDCA8</span><div>';
   html += '<div style="font-size:20px;font-weight:700;color:var(--primary)">' + training.name + '</div>';
-  html += '<div style="font-size:13px;color:var(--text-light)">Kies je apparaat</div>';
+  html += '<div style="font-size:13px;color:var(--text-light)">' + (trainingKey === 'inclineWandelen' ? 'Kies je duur' : 'Kies je apparaat') + '</div>';
   html += '</div></div>';
 
   training.options.forEach(function(opt, i) {
