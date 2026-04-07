@@ -69,6 +69,18 @@ function playTimerSound(type) {
       gain.gain.setValueAtTime(0.25, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
       osc.start(now); osc.stop(now + 0.3);
+    } else if (type === 'double') {
+      // Stronger notification for phase changes: three ascending tones
+      [0, 0.2, 0.4].forEach(function(delay, i) {
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = [660, 880, 1100][i];
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.3, now + delay);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + delay + 0.2);
+        osc.start(now + delay); osc.stop(now + delay + 0.2);
+      });
     } else {
       [0, 0.25].forEach(function(delay) {
         var osc = ctx.createOscillator();
@@ -2217,8 +2229,8 @@ function renderCardioTimerStep() {
     html += '<div style="font-size:12px;color:var(--text-light)">Ronde ' + (intervalTotalCycles + 1) + '</div>';
 
   } else {
-    // Normal phase display
-    html += '<div class="ct-detail">' + phase.detail + '</div>';
+    // Normal phase display — show big detail instruction
+    html += '<div style="font-size:18px;font-weight:600;color:var(--accent);margin:4px 0;padding:8px 16px;background:rgba(255,255,255,0.06);border-radius:12px;display:inline-block">' + phase.detail + '</div>';
 
     // Manual interval badge for medium-intensity phases with old-style interval config
     if (cardioIntervalConfig && cardioIntervalConfig.normalMin && phase.intensity === 'medium') {
@@ -2228,11 +2240,22 @@ function renderCardioTimerStep() {
     }
 
     html += '<div class="tm-timer" id="cardioTimerDisplay">' + formatTimer(cardioPhaseSeconds) + '</div>';
+
+    // Total elapsed timer
+    var totalSecs = cardioPhases.reduce(function(t, p) { return t + p.duur * 60; }, 0);
+    var elapsed = 0;
+    for (var ei = 0; ei < cardioPhaseIndex; ei++) { elapsed += cardioPhases[ei].duur * 60; }
+    elapsed += (cardioPhases[cardioPhaseIndex].duur * 60) - cardioPhaseSeconds;
+    html += '<div style="font-size:13px;color:var(--text-light);margin-top:4px">Totaal: ' + formatTimer(elapsed) + ' / ' + formatTimer(totalSecs) + '</div>';
   }
+
+  // Phase change warning (hidden, shown 10s before change)
+  html += '<div id="cardioPhaseWarning" style="display:none;margin:8px 0;padding:10px 16px;background:linear-gradient(135deg,rgba(244,123,32,0.2),rgba(247,75,122,0.2));border:1px solid var(--accent);border-radius:12px;font-size:14px;font-weight:600;color:var(--accent);animation:pulse 1s infinite"></div>';
 
   // Next phase preview
   if (cardioPhaseIndex < cardioPhases.length - 1) {
-    html += '<div class="ct-next-phase">Hierna: ' + cardioPhases[cardioPhaseIndex + 1].name + '</div>';
+    var nextPhase = cardioPhases[cardioPhaseIndex + 1];
+    html += '<div class="ct-next-phase" style="font-size:13px;color:var(--text-light);margin:8px 0">Hierna: <strong>' + nextPhase.name + '</strong> — ' + nextPhase.detail + '</div>';
   }
 
   html += '<div style="margin-top:24px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">';
@@ -2298,10 +2321,22 @@ function startCardioCountdown() {
       if (display) display.textContent = formatTimer(cardioPhaseSeconds);
     }
 
+    // 10-second warning before phase change
+    if (cardioPhaseSeconds === 10 && cardioPhaseIndex < cardioPhases.length - 1) {
+      playBeep(660, 0.1);
+      hapticFeedback('light');
+      var warn = document.getElementById('cardioPhaseWarning');
+      if (warn) {
+        var next = cardioPhases[cardioPhaseIndex + 1];
+        warn.textContent = '⏱ Bijna klaar! Hierna: ' + next.name + ' — ' + next.detail;
+        warn.style.display = 'block';
+      }
+    }
+
     // Phase ended
     if (cardioPhaseSeconds <= 0) {
-      hapticFeedback('medium');
-      playTimerSound('short');
+      hapticFeedback('heavy');
+      playTimerSound('double');
       advanceCardioPhase();
     }
   }, 500);
@@ -2316,6 +2351,15 @@ function advanceCardioPhase() {
   cardioPhaseSeconds = cardioPhases[cardioPhaseIndex].duur * 60;
   cardioIntervalMode = 'slow';
   initIntervalForPhase();
+
+  // Flash the screen to signal phase change
+  var body = document.getElementById('tmBody');
+  if (body) {
+    body.style.transition = 'background 0.3s';
+    body.style.background = 'rgba(123,63,160,0.4)';
+    setTimeout(function() { body.style.background = ''; }, 600);
+  }
+
   renderCardioTimerStep();
 }
 
