@@ -5682,7 +5682,8 @@ function renderAgenda() {
   for (var w = -1; w < 4; w++) {
     var weekStart = getMonday(now, w);
     var weekNum = getWeekNumber(weekStart);
-    var weekType = weekNum % 2 === 0 ? 'A' : 'B';
+    var weekBEnabled = getStore('weekBEnabled', false);
+    var weekType = (weekBEnabled && weekNum % 2 !== 0) ? 'B' : 'A';
     var isCurrentWeek = w === 0;
 
     html += '<div class="agenda-week"' + (isCurrentWeek ? ' id="agendaCurrentWeek"' : '') + '>';
