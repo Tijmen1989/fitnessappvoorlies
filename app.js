@@ -839,13 +839,17 @@ function getProgressionSuggestion(exerciseId) {
   var isBodyweight = exerciseDef.isBodyweight || exerciseDef.isPlank;
 
   // Get last session data with full sets info
+  // For bodyweight/plank: only count sessions with actual reps recorded (ignore legacy 0-data)
   var sessions = getStore('sessions', []);
   var lastSession = null;
   for (var i = sessions.length - 1; i >= 0; i--) {
     var s = sessions[i];
     if (s.exercises) {
       var ex = s.exercises.find(function(e) { return e.id === exerciseId; });
-      if (ex && !ex.skipped && (isBodyweight || ex.weight > 0)) { lastSession = ex; break; }
+      if (ex && !ex.skipped) {
+        if (isBodyweight && (ex.reps || 0) > 0) { lastSession = ex; break; }
+        if (!isBodyweight && ex.weight > 0) { lastSession = ex; break; }
+      }
     }
   }
   if (!lastSession) {
@@ -899,12 +903,14 @@ function getProgressionSuggestion(exerciseId) {
   }
 
   // Count how many consecutive sessions at this weight hit max reps
+  // Skip sessions without this exercise (e.g. other training days in between)
   var consecutiveMaxSessions = 0;
   for (var j = sessions.length - 1; j >= 0; j--) {
     var sess = sessions[j];
     if (!sess.exercises) continue;
     var exData = sess.exercises.find(function(e) { return e.id === exerciseId; });
-    if (!exData || exData.weight !== lastWeight) break;
+    if (!exData || exData.skipped) continue; // skip unrelated training days
+    if (exData.weight !== lastWeight) break;
     var setsOk = false;
     if (exData.sets && exData.sets.length >= numSets) {
       setsOk = exData.sets.every(function(set) { return (set.reps || 0) >= maxReps; });
@@ -1736,7 +1742,12 @@ function completeSet() {
     var r = Math.max(1, parseInt(rEl.value) || ex.defaultReps);
     sessionExerciseLog[logKey] = { id: ex.id, weight: w, reps: r, done: true };
   } else {
-    sessionExerciseLog[logKey] = { id: ex.id, weight: 0, reps: 0, done: true };
+    // Plank: store actual seconds held as reps (target - remaining)
+    var total = _timerTotalSeconds || 0;
+    var remaining = tmTimerSeconds || 0;
+    var heldSec = Math.max(0, total - remaining);
+    // If natural completion (remaining hit 0), heldSec == total; if stopped early, less
+    sessionExerciseLog[logKey] = { id: ex.id, weight: 0, reps: heldSec, done: true };
   }
 
   // Start rest timer (shorter rest after last set before next exercise)
@@ -5803,6 +5814,7 @@ function closeDayPreview() {
 
 function renderKrachtPreview(container, training, trainingKey, dateStr) {
   var isMissed = false;
+  var isFuture = false;
   if (dateStr) {
     var previewDate = new Date(dateStr);
     var today = new Date();
@@ -5819,6 +5831,8 @@ function renderKrachtPreview(container, training, trainingKey, dateStr) {
         var daysAgo = Math.floor((today - previewDate) / 86400000);
         if (daysAgo <= 7) isMissed = true;
       }
+    } else if (previewDate > today) {
+      isFuture = true;
     }
   }
 
@@ -5833,6 +5847,12 @@ function renderKrachtPreview(container, training, trainingKey, dateStr) {
     html += '<div style="font-size:13px;color:var(--text-light);margin-bottom:10px">\u26A0\uFE0F Deze training is niet gedaan. Wil je hem nu alsnog doen?</div>';
     html += '<button onclick="catchUpFromPreview(\'' + trainingKey + '\')" style="width:100%;padding:14px;border-radius:50px;border:none;background:linear-gradient(135deg,#7B3FA0,#B794D6);color:white;font-size:16px;font-weight:700;cursor:pointer;box-shadow:var(--glow-primary)">';
     html += '\uD83D\uDCAA Nu doen</button>';
+    html += '</div>';
+  } else if (isFuture) {
+    html += '<div style="padding:14px 18px;background:var(--info-bg);border-bottom:1px solid var(--border)">';
+    html += '<div style="font-size:13px;color:var(--text-light);margin-bottom:10px">\u23E9 Training staat gepland voor deze dag. Wil je hem vandaag alvast doen?</div>';
+    html += '<button onclick="catchUpFromPreview(\'' + trainingKey + '\')" style="width:100%;padding:14px;border-radius:50px;border:none;background:linear-gradient(135deg,#7B3FA0,#B794D6);color:white;font-size:16px;font-weight:700;cursor:pointer;box-shadow:var(--glow-primary)">';
+    html += '\uD83D\uDCAA Nu alvast doen</button>';
     html += '</div>';
   }
 
