@@ -2642,10 +2642,17 @@ function renderVandaagAnders(currentTrainingKey) {
     html += '<div style="font-size:12px;color:var(--text-light)">Deze training staat klaar voor morgen</div></div></div>';
   }
 
-  // Option 1: Loopband wandelen
+  // Option 0b: Snel loggen — "Ik heb vandaag gelopen"
+  html += '<div class="vandaag-anders-item" onclick="showQuickWalkLog()" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--card);border-radius:12px;margin-bottom:8px;cursor:pointer;border:1px solid var(--success)">';
+  html += '<span style="font-size:22px">\uD83D\uDEB6</span>';
+  html += '<div style="flex:1"><div style="font-weight:600;font-size:14px">Ik heb vandaag gelopen</div>';
+  html += '<div style="font-size:12px;color:var(--text-light)">Snel loggen zonder timer</div></div>';
+  html += '<span style="color:var(--success);font-size:14px">\u2714\uFE0F</span></div>';
+
+  // Option 1: Loopband wandelen (met timer)
   html += '<div class="vandaag-anders-item" onclick="startLoopbandWandelen()" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--card);border-radius:12px;margin-bottom:8px;cursor:pointer;border:1px solid var(--border)">';
   html += '<span style="font-size:22px">\uD83D\uDEB6\u200D\u2640\uFE0F</span>';
-  html += '<div style="flex:1"><div style="font-weight:600;font-size:14px">Loopband wandelen</div>';
+  html += '<div style="flex:1"><div style="font-weight:600;font-size:14px">Loopband wandelen (met timer)</div>';
   html += '<div style="font-size:12px;color:var(--text-light)">Rustig 30 min wandelen \u2014 laagdrempelig maar effectief</div></div>';
   html += '<span style="color:var(--text-light);font-size:12px">\u25B6</span></div>';
 
@@ -2724,6 +2731,122 @@ function skipTrainingToday() {
   html += '<button class="start-btn-primary" onclick="startLoopbandWandelen()" style="flex:1;min-width:140px">\uD83D\uDEB6 Toch even wandelen?</button>';
   html += '<button class="start-btn-primary" onclick="startStretchTimer()" style="flex:1;min-width:140px;background:var(--card);color:var(--text);border:1px solid var(--border)">\uD83E\uDDD8 Stretchen?</button>';
   html += '</div></div>';
+  content.innerHTML = html;
+}
+
+// ================================================================
+// SNEL LOGGEN — "Ik heb vandaag gelopen"
+// ================================================================
+function showQuickWalkLog() {
+  var content = document.getElementById('todayContent');
+  var html = '<div class="card" style="text-align:center;padding:24px 20px">';
+  html += '<div style="font-size:40px;margin-bottom:12px">\uD83D\uDEB6</div>';
+  html += '<h2 style="margin:0 0 12px;color:var(--text);font-size:20px">Hoe lang heb je gelopen?</h2>';
+
+  // Duration picker — quick buttons
+  html += '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:16px">';
+  var durations = [15, 20, 30, 45, 60];
+  for (var i = 0; i < durations.length; i++) {
+    var d = durations[i];
+    var sel = d === 30 ? 'background:var(--primary);color:white;border-color:var(--primary)' : 'background:var(--card);color:var(--text);border-color:var(--border)';
+    html += '<button onclick="selectQuickWalkDuration(' + d + ',this)" data-dur="' + d + '" ';
+    html += 'style="min-width:56px;padding:12px 10px;border:2px solid;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;' + sel + '">';
+    html += d + ' min</button>';
+  }
+  html += '</div>';
+  html += '<input type="hidden" id="quickWalkDuration" value="30">';
+
+  // Optional: type of walk
+  html += '<div style="margin-bottom:16px">';
+  html += '<div style="font-size:12px;color:var(--text-light);margin-bottom:6px">Wat voor wandeling?</div>';
+  html += '<div style="display:flex;gap:6px;justify-content:center">';
+  var walkTypes = [
+    { val: 'buiten', label: 'Buiten', emoji: '\uD83C\uDF33', sel: true },
+    { val: 'loopband', label: 'Loopband', emoji: '\uD83C\uDFCB\uFE0F', sel: false },
+    { val: 'hardlopen', label: 'Hardlopen', emoji: '\uD83C\uDFC3\u200D\u2640\uFE0F', sel: false }
+  ];
+  for (var t = 0; t < walkTypes.length; t++) {
+    var wt = walkTypes[t];
+    var wtStyle = wt.sel ? 'background:var(--primary);color:white;border-color:var(--primary)' : 'background:var(--card);color:var(--text);border-color:var(--border)';
+    html += '<button onclick="selectQuickWalkType(\'' + wt.val + '\',this)" data-type="' + wt.val + '" ';
+    html += 'style="flex:1;padding:10px 6px;border:2px solid;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;' + wtStyle + '">';
+    html += wt.emoji + ' ' + wt.label + '</button>';
+  }
+  html += '</div>';
+  html += '<input type="hidden" id="quickWalkType" value="buiten">';
+  html += '</div>';
+
+  html += '<button onclick="saveQuickWalk()" style="width:100%;padding:14px;background:var(--success);color:white;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer">\u2714 Opslaan</button>';
+  html += '<button onclick="renderToday()" style="width:100%;padding:10px;background:none;border:none;color:var(--text-light);font-size:13px;cursor:pointer;margin-top:8px">Annuleren</button>';
+  html += '</div>';
+  content.innerHTML = html;
+}
+
+function selectQuickWalkDuration(dur, btn) {
+  document.getElementById('quickWalkDuration').value = dur;
+  var parent = btn.parentElement;
+  var btns = parent.querySelectorAll('button');
+  btns.forEach(function(b) {
+    b.style.background = 'var(--card)';
+    b.style.color = 'var(--text)';
+    b.style.borderColor = 'var(--border)';
+  });
+  btn.style.background = 'var(--primary)';
+  btn.style.color = 'white';
+  btn.style.borderColor = 'var(--primary)';
+}
+
+function selectQuickWalkType(type, btn) {
+  document.getElementById('quickWalkType').value = type;
+  var parent = btn.parentElement;
+  var btns = parent.querySelectorAll('button');
+  btns.forEach(function(b) {
+    b.style.background = 'var(--card)';
+    b.style.color = 'var(--text)';
+    b.style.borderColor = 'var(--border)';
+  });
+  btn.style.background = 'var(--primary)';
+  btn.style.color = 'white';
+  btn.style.borderColor = 'var(--primary)';
+}
+
+function saveQuickWalk() {
+  var duration = parseInt(document.getElementById('quickWalkDuration').value) || 30;
+  var walkType = document.getElementById('quickWalkType').value || 'buiten';
+  var today = new Date().toISOString().split('T')[0];
+  var sessions = getStore('sessions', []);
+
+  var typeLabels = { buiten: 'Gewandeld (buiten)', loopband: 'Gewandeld (loopband)', hardlopen: 'Hardgelopen' };
+  var name = typeLabels[walkType] || 'Gewandeld';
+
+  // Check for duplicate
+  var alreadyLogged = sessions.some(function(s) {
+    return s.date === today && s.type === 'cardio' && s.quickWalk;
+  });
+  if (alreadyLogged) {
+    if (!confirm('Je hebt vandaag al een wandeling gelogd. Nog een toevoegen?')) return;
+  }
+
+  sessions.push({
+    date: today,
+    type: 'cardio',
+    name: name,
+    trainingKey: 'quickWalk',
+    duration: duration,
+    quickWalk: true,
+    walkType: walkType
+  });
+  setStore('sessions', sessions);
+
+  // Show confirmation
+  var content = document.getElementById('todayContent');
+  var html = '<div class="card" style="text-align:center;padding:32px 24px">';
+  html += '<div style="font-size:48px;margin-bottom:16px">\u2705</div>';
+  html += '<h2 style="margin:0 0 8px;color:var(--text)">Lekker bezig!</h2>';
+  html += '<p style="color:var(--text-light);font-size:14px;margin:0 0 4px">' + name + ' \u2014 ' + duration + ' minuten opgeslagen.</p>';
+  html += '<p style="color:var(--success);font-size:13px;margin:0 0 20px">Elke stap telt \uD83D\uDC9A</p>';
+  html += '<button onclick="renderToday()" style="padding:10px 24px;background:var(--primary);color:white;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Terug naar vandaag</button>';
+  html += '</div>';
   content.innerHTML = html;
 }
 
