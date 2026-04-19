@@ -881,7 +881,7 @@ function getProgressionSuggestion(exerciseId) {
         message: '\uD83D\uDCAA ' + numSets + '\u00d7' + maxReps + ' ' + bwUnit + ' gehaald! Probeer langzamer of met pauzes.'
       };
     }
-    var bwNext = Math.min(bwReps + 2, maxReps);
+    var bwNext = Math.min(bwReps + 1, maxReps);
     return { ready: false, current: 0, suggested: 0, targetReps: bwNext,
       message: 'Probeer ' + numSets + '\u00d7' + bwNext + ' ' + bwUnit + ' (was ' + bwReps + ')'
     };
@@ -945,15 +945,57 @@ function getProgressionSuggestion(exerciseId) {
       message: '\u2705 ' + lastWeight + ' ' + unit + ' \u00b7 ' + numSets + '\u00d7' + maxReps + ' \u2014 haal dit nog 1x, dan gewicht omhoog!'
     };
   } else if (lastReps < maxReps) {
-    // Not at max reps yet → suggest more reps at same weight (steps of 2: 8→10→12)
-    var nextReps = Math.min(lastReps + 2, maxReps);
-    return {
-      ready: false,
-      current: lastWeight,
-      suggested: lastWeight,
-      targetReps: nextReps,
-      message: lastWeight + ' ' + unit + ' \u00b7 probeer ' + numSets + '\u00d7' + nextReps + ' (zelfde gewicht, meer herhalingen)'
-    };
+    // Count consecutive sessions at same weight AND same reps
+    var consecutiveSameReps = 0;
+    for (var cr = sessions.length - 1; cr >= 0; cr--) {
+      var crSess = sessions[cr];
+      if (!crSess.exercises) continue;
+      var crEx = crSess.exercises.find(function(e) { return e.id === exerciseId; });
+      if (!crEx || crEx.skipped) continue;
+      if (crEx.weight !== lastWeight) break;
+      // Check reps: use minimum of all sets, or summary reps
+      var crReps = crEx.reps || 0;
+      if (crEx.sets && crEx.sets.length > 0) {
+        crReps = Math.min.apply(null, crEx.sets.map(function(s) { return s.reps || 0; }));
+      }
+      if (crReps >= lastReps) consecutiveSameReps++;
+      else break;
+    }
+
+    if (consecutiveSameReps >= 2) {
+      // Consistent at this rep count for 2+ sessions → suggest +1 rep
+      var nextReps = Math.min(lastReps + 1, maxReps);
+      return {
+        ready: false,
+        current: lastWeight,
+        suggested: lastWeight,
+        targetReps: nextReps,
+        message: lastWeight + ' ' + unit + ' \u00b7 probeer ' + numSets + '\u00d7' + nextReps + ' (zelfde gewicht, +1 herhaling)'
+      };
+    } else {
+      // Not yet consistent — repeat same reps to build consistency
+      // Check if plateauing (5+ sessions at same weight without progress)
+      var sessionsAtWeight = 0;
+      for (var pw = sessions.length - 1; pw >= 0; pw--) {
+        var pwSess = sessions[pw];
+        if (!pwSess.exercises) continue;
+        var pwEx = pwSess.exercises.find(function(e) { return e.id === exerciseId; });
+        if (!pwEx || pwEx.skipped) continue;
+        if (pwEx.weight !== lastWeight) break;
+        sessionsAtWeight++;
+      }
+      var plateauMsg = '';
+      if (sessionsAtWeight >= 5) {
+        plateauMsg = ' \u2014 je bouwt kracht op, dit is normaal!';
+      }
+      return {
+        ready: false,
+        current: lastWeight,
+        suggested: lastWeight,
+        targetReps: lastReps,
+        message: lastWeight + ' ' + unit + ' \u00b7 ' + numSets + '\u00d7' + lastReps + ' nog een keer herhalen' + plateauMsg
+      };
+    }
   }
 
   return null;
