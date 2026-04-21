@@ -839,17 +839,13 @@ function getProgressionSuggestion(exerciseId) {
   var isBodyweight = exerciseDef.isBodyweight || exerciseDef.isPlank;
 
   // Get last session data with full sets info
-  // For bodyweight/plank: only count sessions with actual reps recorded (ignore legacy 0-data)
   var sessions = getStore('sessions', []);
   var lastSession = null;
   for (var i = sessions.length - 1; i >= 0; i--) {
     var s = sessions[i];
     if (s.exercises) {
       var ex = s.exercises.find(function(e) { return e.id === exerciseId; });
-      if (ex && !ex.skipped) {
-        if (isBodyweight && (ex.reps || 0) > 0) { lastSession = ex; break; }
-        if (!isBodyweight && ex.weight > 0) { lastSession = ex; break; }
-      }
+      if (ex && !ex.skipped && (isBodyweight || ex.weight > 0)) { lastSession = ex; break; }
     }
   }
   if (!lastSession) {
