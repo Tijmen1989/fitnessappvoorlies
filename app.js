@@ -1446,10 +1446,20 @@ function renderTrainingStep() {
     if (tmState === 'plank-timer') {
       html += '<div class="tm-timer plank-active" id="tmTimerDisplay">' + formatTimer(tmTimerSeconds) + '</div>';
       html += '<div style="font-size:14px;color:var(--text-light);margin-bottom:16px">Hou vol! Je kunt dit!</div>';
-      html += '<button class="tm-btn tm-btn-success" onclick="clearInterval(tmTimerInterval);tmState=\'idle\';completeSet()">Plank klaar! \u2714</button>';
+      html += '<button class="tm-btn tm-btn-success" onclick="stopPlankTimer()">Plank klaar! \u2714</button>';
+    } else if (tmState === 'plank-confirm') {
+      var confirmSec = _plankHeldSeconds || plankTarget;
+      html += '<div style="font-size:14px;color:var(--text-light);margin-bottom:12px">Hoeveel seconden heb je volgehouden?</div>';
+      html += '<div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:20px">';
+      html += '<button onclick="adjustPlankSeconds(-1)" style="width:48px;height:48px;border-radius:50%;border:2px solid var(--border);background:var(--card);font-size:22px;font-weight:700;cursor:pointer;color:var(--text)">\u2212</button>';
+      html += '<span id="plankSecDisplay" style="font-size:36px;font-weight:800;color:var(--primary);min-width:60px;text-align:center">' + confirmSec + '</span>';
+      html += '<button onclick="adjustPlankSeconds(1)" style="width:48px;height:48px;border-radius:50%;border:2px solid var(--border);background:var(--card);font-size:22px;font-weight:700;cursor:pointer;color:var(--text)">+</button>';
+      html += '</div>';
+      html += '<button class="tm-btn tm-btn-success" onclick="confirmPlankSeconds()" style="width:100%">Bevestig \u2714</button>';
     } else {
       html += '<div style="margin-bottom:16px;font-size:16px;color:var(--text-light)">Doel: ' + plankTarget + ' seconden</div>';
-      html += '<button class="tm-btn tm-btn-accent" onclick="startPlankTimer(' + plankTarget + ')">Start plank timer (' + plankTarget + ' sec)</button>';
+      html += '<button class="tm-btn tm-btn-accent" onclick="startPlankTimer(' + plankTarget + ')" style="margin-bottom:8px">Start plank timer (' + plankTarget + ' sec)</button>';
+      html += '<button class="tm-btn" onclick="skipPlankTimer(' + plankTarget + ')" style="font-size:13px;opacity:0.7">Zonder timer \u2014 zelf invullen</button>';
     }
   }
 
@@ -1736,6 +1746,34 @@ function finishCooldown() {
   exitTrainingMode(true);
 }
 
+var _plankHeldSeconds = 0;
+
+function stopPlankTimer() {
+  clearInterval(tmTimerInterval);
+  var total = _timerTotalSeconds || 0;
+  var remaining = tmTimerSeconds || 0;
+  _plankHeldSeconds = Math.max(1, total - remaining);
+  tmState = 'plank-confirm';
+  renderTrainingStep();
+}
+
+function skipPlankTimer(target) {
+  _plankHeldSeconds = target;
+  tmState = 'plank-confirm';
+  renderTrainingStep();
+}
+
+function adjustPlankSeconds(delta) {
+  _plankHeldSeconds = Math.max(1, _plankHeldSeconds + delta);
+  var display = document.getElementById('plankSecDisplay');
+  if (display) display.textContent = _plankHeldSeconds;
+}
+
+function confirmPlankSeconds() {
+  tmState = 'idle';
+  completeSet();
+}
+
 function toggleTmInstruction() {
   var box = document.getElementById('tmInstructionBox');
   if (box) {
@@ -1760,8 +1798,10 @@ function startPlankTimer(seconds) {
       clearInterval(tmTimerInterval);
       hapticFeedback('heavy');
       playTimerSound('double');
-      tmState = 'idle';
-      completeSet();
+      // Go to confirm screen instead of auto-completing
+      _plankHeldSeconds = _timerTotalSeconds;
+      tmState = 'plank-confirm';
+      renderTrainingStep();
     }
   }, 500);
 }
@@ -1780,11 +1820,8 @@ function completeSet() {
     var r = Math.max(1, parseInt(rEl.value) || ex.defaultReps);
     sessionExerciseLog[logKey] = { id: ex.id, weight: w, reps: r, done: true };
   } else {
-    // Plank: store actual seconds held as reps (target - remaining)
-    var total = _timerTotalSeconds || 0;
-    var remaining = tmTimerSeconds || 0;
-    var heldSec = Math.max(0, total - remaining);
-    // If natural completion (remaining hit 0), heldSec == total; if stopped early, less
+    // Plank: use confirmed seconds from plank-confirm screen
+    var heldSec = _plankHeldSeconds || 0;
     sessionExerciseLog[logKey] = { id: ex.id, weight: 0, reps: heldSec, done: true };
   }
 
