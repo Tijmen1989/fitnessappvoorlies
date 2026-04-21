@@ -872,6 +872,12 @@ function getProgressionSuggestion(exerciseId) {
   if (isBodyweight) {
     var bwReps = lastSession.reps || minReps;
     var bwUnit = exerciseDef.isPlank ? 'sec' : 'reps';
+    if (exerciseDef.isPlank) {
+      // Plank: no push to go longer, just show last time as reference
+      return { ready: false, current: 0, suggested: 0, targetReps: bwReps,
+        message: 'Vorige keer: ' + bwReps + ' sec \u2014 pas aan hoe je je voelt'
+      };
+    }
     if (bwReps >= maxReps) {
       return { ready: true, current: 0, suggested: 0, targetReps: maxReps,
         message: '\uD83D\uDCAA ' + numSets + '\u00d7' + maxReps + ' ' + bwUnit + ' gehaald! Probeer langzamer of met pauzes.'
